@@ -206,6 +206,26 @@ func nullStr(p *string) any {
 	return *p
 }
 
+// dateOnly normalizes a date column value to YYYY-MM-DD. The go-libsql driver
+// coerces date-like string parameters to RFC3339 (e.g. "2026-06-22" becomes
+// "2026-06-22T00:00:00Z") on write, so reads come back with a time component
+// that must be stripped for bare-date comparisons.
+func dateOnly(s string) string {
+	if i := strings.IndexByte(s, 'T'); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
+// dateStrFromNull converts a nullable date column to a normalized *string.
+func dateStrFromNull(ns sql.NullString) *string {
+	if !ns.Valid {
+		return nil
+	}
+	v := dateOnly(ns.String)
+	return &v
+}
+
 // nullInt converts a *int64 to a sql null-aware value for binding.
 func nullInt(p *int64) any {
 	if p == nil {

@@ -23,6 +23,7 @@ func scanPost(row interface{ Scan(...any) error }) (domain.Post, error) {
 	}
 	p.SprintID = intFromNull(sprintID)
 	p.SourceLogID = intFromNull(sourceLogID)
+	p.PostDate = dateOnly(p.PostDate)
 	p.IsDeclaration = isDecl == 1
 	p.CreatedAt = parseTime(createdAt)
 	p.UpdatedAt = parseTime(updatedAt)

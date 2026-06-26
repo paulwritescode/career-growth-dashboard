@@ -23,6 +23,7 @@ func scanLog(row interface{ Scan(...any) error }) (domain.DailyLog, error) {
 		return domain.DailyLog{}, err
 	}
 	l.SprintID = intFromNull(sprintID)
+	l.LogDate = dateOnly(l.LogDate)
 	if blockerDec.Valid {
 		bd := domain.BlockerDecision(blockerDec.String)
 		l.BlockerDecision = &bd
@@ -104,6 +105,26 @@ func (s *Store) ListLogsBySprint(ctx context.Context, sprintID int64) ([]domain.
 	}
 	defer rows.Close()
 	return collectLogs(rows)
+}
+
+// UpdateLog persists the mutable fields of a daily log.
+func (s *Store) UpdateLog(ctx context.Context, l domain.DailyLog) error {
+	var bd any
+	if l.BlockerDecision != nil {
+		bd = string(*l.BlockerDecision)
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE daily_logs SET
+		sprint_id=?, log_date=?, worked_on=?, what_happened=?, insight=?, next_up=?,
+		blocker=?, blocker_decision=?, updated_at=? WHERE id=?`,
+		nullInt(l.SprintID), l.LogDate, l.WorkedOn, l.WhatHappened, l.Insight, l.NextUp,
+		l.Blocker, bd, nowUTC(), l.ID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func collectLogs(rows *sql.Rows) ([]domain.DailyLog, error) {

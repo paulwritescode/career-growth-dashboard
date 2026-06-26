@@ -23,7 +23,7 @@ func scanADR(row interface{ Scan(...any) error }) (domain.ADR, error) {
 		return domain.ADR{}, err
 	}
 	a.SprintID = intFromNull(sprintID)
-	a.DecidedOn = strFromNull(decidedOn)
+	a.DecidedOn = dateStrFromNull(decidedOn)
 	a.CreatedAt = parseTime(createdAt)
 	a.UpdatedAt = parseTime(updatedAt)
 	return a, nil

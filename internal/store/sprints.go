@@ -34,8 +34,8 @@ func scanSprint(row interface{ Scan(...any) error }) (domain.Sprint, error) {
 	}
 	s.LiveURL = strFromNull(liveURL)
 	s.DeclarationPostID = intFromNull(declPostID)
-	s.StartedOn = strFromNull(startedOn)
-	s.EndedOn = strFromNull(endedOn)
+	s.StartedOn = dateStrFromNull(startedOn)
+	s.EndedOn = dateStrFromNull(endedOn)
 	s.CreatedAt = parseTime(createdAt)
 	s.UpdatedAt = parseTime(updatedAt)
 	return s, nil
