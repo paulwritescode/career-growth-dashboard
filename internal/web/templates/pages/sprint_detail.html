@@ -1,0 +1,80 @@
+{{define "content"}}
+{{$s := .Sprint}}
+<div class="card">
+  <div class="sprint-head">
+    <div><strong>{{$s.SkillName}}</strong> — {{$s.MicroappOneLiner}}</div>
+    <div class="muted mono">{{$s.MonthLabel}} · {{$s.Status}}{{if $s.DeployPlatform}} · {{$s.DeployPlatform}}{{end}}</div>
+  </div>
+  {{if $s.LiveURL}}<div>live: <a href="{{derefStr $s.LiveURL}}">{{derefStr $s.LiveURL}}</a></div>{{end}}
+  <div class="kv"><span class="muted">why:</span> {{$s.SkillRationale}}</div>
+  <div class="kv"><span class="muted">core feature:</span> {{$s.CoreFeature}}</div>
+  <div class="kv"><span class="muted">out of scope:</span> {{$s.OutOfScope}}</div>
+
+  <div class="stepper">
+    {{$cur := $s.CurrentPhase}}
+    {{range phases}}
+      <form method="post" action="/sprints/{{$s.ID}}/phase" class="step-form">
+        <input type="hidden" name="phase" value="{{.}}">
+        <button class="step {{if eq . $cur}}step-current{{else if lt . $cur}}step-done{{end}}" type="submit">{{.}} {{phaseLabel .}}</button>
+      </form>
+    {{end}}
+  </div>
+  <div class="health health-{{.Health}}">phase health: {{.Health}} ({{.Unchecked}} unchecked in current phase)</div>
+
+  <form method="post" action="/sprints/{{$s.ID}}/status" class="inline-form">
+    <select name="status">
+      <option value="planned" {{if eq $s.Status "planned"}}selected{{end}}>planned</option>
+      <option value="active" {{if eq $s.Status "active"}}selected{{end}}>active</option>
+      <option value="shipped" {{if eq $s.Status "shipped"}}selected{{end}}>shipped</option>
+      <option value="abandoned" {{if eq $s.Status "abandoned"}}selected{{end}}>abandoned</option>
+    </select>
+    <input type="url" name="live_url" placeholder="live URL (required to ship)" value="{{derefStr $s.LiveURL}}">
+    <button class="btn" type="submit">update status</button>
+  </form>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head">Phase checklist</div>
+    {{range phases}}
+      {{$phase := .}}
+      <div class="check-phase">{{.}} · {{phaseLabel .}}</div>
+      {{range index $.Checklist .}}
+        <form method="post" action="/checklist/{{.ID}}/toggle" class="check-row">
+          <input type="hidden" name="done" value="{{if .IsDone}}false{{else}}true{{end}}">
+          <button class="check-box {{if .IsDone}}checked{{end}}" type="submit">{{if .IsDone}}✓{{else}} {{end}}</button>
+          <span class="{{if .IsDone}}done{{end}}">{{.Label}}</span>
+        </form>
+      {{end}}
+    {{end}}
+  </div>
+
+  <div class="card">
+    <div class="card-head">Daily logs</div>
+    <form method="post" action="/logs" class="stack">
+      <input type="hidden" name="sprint_id" value="{{$s.ID}}">
+      <input type="text" name="worked_on" placeholder="what I worked on (required)" required>
+      <input type="text" name="insight" placeholder="the fix / insight / decision">
+      <button class="btn" type="submit">log entry</button>
+    </form>
+    <div class="logstream">
+      {{range .Logs}}
+        <div class="logline"><span class="mono muted">{{.LogDate}}</span> {{.WorkedOn}}{{if .Insight}} — <span class="muted">{{.Insight}}</span>{{end}}</div>
+      {{else}}
+        <div class="muted">No logs yet for this sprint.</div>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">Retro</div>
+  <form method="post" action="/sprints/{{$s.ID}}/retro" class="stack">
+    <input type="text" name="retro_worked" placeholder="what worked" value="{{$s.RetroWorked}}">
+    <input type="text" name="retro_differently" placeholder="what I'd do differently" value="{{$s.RetroDifferently}}">
+    <input type="text" name="retro_learned" placeholder="top things learned" value="{{$s.RetroLearned}}">
+    <input type="url" name="retro_live_link" placeholder="live link" value="{{$s.RetroLiveLink}}">
+    <button class="btn" type="submit">save retro</button>
+  </form>
+</div>
+{{end}}

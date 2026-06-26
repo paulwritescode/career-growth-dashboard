@@ -1,0 +1,25 @@
+{{define "content"}}
+<div class="grid grid-4 stat-row">
+  <div class="card stat"><div class="stat-label">CADENCE · 7d</div><div class="stat-val mono">{{pct .Cadence7}}</div></div>
+  <div class="card stat"><div class="stat-label">CADENCE · 30d</div><div class="stat-val mono">{{pct .Cadence30}}</div></div>
+  <div class="card stat"><div class="stat-label">CADENCE · 90d</div><div class="stat-val mono">{{pct .Cadence90}}</div></div>
+  <div class="card stat"><div class="stat-label">SHIP RATE</div><div class="stat-val mono">{{pct .ShipRate.Rate}}</div><div class="muted">{{.ShipRate.Shipped}}/{{.ShipRate.Ended}}</div></div>
+</div>
+
+<div class="card">
+  <div class="card-head">Published per day · 90d</div>
+  <div class="chart-wrap">{{sparkline .Heatmap}}</div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head">Tier mix · published · 90d</div>
+    <div class="chart-wrap">{{tierBars .TierMix}}</div>
+  </div>
+  <div class="card">
+    <div class="card-head">Streaks</div>
+    <div class="stat-val mono">{{.Streaks.Current}}</div><div class="muted">current streak (days)</div>
+    <div class="stat-val mono">{{.Streaks.Longest}}</div><div class="muted">longest streak (days)</div>
+  </div>
+</div>
+{{end}}

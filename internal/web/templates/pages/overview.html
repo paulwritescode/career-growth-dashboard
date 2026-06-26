@@ -1,0 +1,63 @@
+{{define "content"}}
+<div class="grid grid-4 stat-row">
+  <div class="card stat"><div class="stat-label">CADENCE · 30d</div><div class="stat-val mono">{{pct .Cadence}}</div></div>
+  <div class="card stat"><div class="stat-label">CURRENT STREAK</div><div class="stat-val mono">{{.Streaks.Current}}</div><div class="muted">days</div></div>
+  <div class="card stat"><div class="stat-label">LONGEST STREAK</div><div class="stat-val mono">{{.Streaks.Longest}}</div><div class="muted">days</div></div>
+  <div class="card stat"><div class="stat-label">SHIP RATE</div><div class="stat-val mono">{{pct .ShipRate.Rate}}</div><div class="muted">{{.ShipRate.Shipped}}/{{.ShipRate.Ended}} ended</div></div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head">Today — {{.Snapshot.Date}}{{if .Snapshot.IsBufferDay}} <span class="tag">buffer day (Fri)</span>{{end}}</div>
+    {{if .Snapshot.HasPost}}
+      <div class="chips">
+        {{range .Snapshot.Post.Tiers}}
+          <span class="chip chip-{{.Status}}">{{.Tier.Label}} · {{.Status}}</span>
+        {{end}}
+      </div>
+      <a class="btn" href="/posts/{{.Snapshot.Post.ID}}">open post</a>
+    {{else}}
+      {{if .Snapshot.IsBufferDay}}
+        <p class="muted">No cadence expectation today — Friday is a buffer.</p>
+      {{else}}
+        <p class="muted">No post yet today.</p>
+      {{end}}
+      <form method="post" action="/posts"><input type="hidden" name="post_type" value="daily">
+        <button class="btn" type="submit">start today's post</button></form>
+    {{end}}
+  </div>
+
+  <div class="card">
+    <div class="card-head">Project today</div>
+    {{if .Snapshot.LoggedToday}}
+      <p>✓ Build log recorded for today.</p>
+    {{else}}
+      <p class="muted">No build log yet today.</p>
+    {{end}}
+    <a class="btn" href="/new#log">log today</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">Current sprint</div>
+  {{if .Snapshot.HasSprint}}
+    {{with .Snapshot.Sprint}}
+    <div class="sprint-head">
+      <div><strong>{{.SkillName}}</strong> — {{.MicroappOneLiner}}</div>
+      <div class="muted mono">{{.MonthLabel}} · {{.Status}}{{if .LiveURL}} · <a href="{{derefStr .LiveURL}}">{{derefStr .LiveURL}}</a>{{end}}</div>
+    </div>
+    <div class="stepper">
+      {{$cur := .CurrentPhase}}
+      {{range phases}}
+        <div class="step {{if eq . $cur}}step-current{{else if lt . $cur}}step-done{{end}}">{{.}} {{phaseLabel .}}</div>
+      {{end}}
+    </div>
+    {{end}}
+    <div class="health health-{{.Snapshot.PhaseHealth}}">phase health: {{.Snapshot.PhaseHealth}} ({{.Snapshot.UncheckedNow}} unchecked in current phase)</div>
+    <a class="btn" href="/sprints/{{.Snapshot.Sprint.ID}}">open sprint</a>
+  {{else}}
+    <p class="muted">No active sprint. Start one to begin a month-long skill sprint.</p>
+    <a class="btn" href="/new#sprint">start a sprint</a>
+  {{end}}
+</div>
+{{end}}

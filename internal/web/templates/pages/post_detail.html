@@ -1,0 +1,50 @@
+{{define "content"}}
+{{$p := .Post}}
+<div class="card">
+  <div class="sprint-head">
+    <div><strong>{{$p.PostType}}</strong> · {{$p.PostDate}}</div>
+    <div class="muted">{{if $p.Title}}{{$p.Title}}{{end}}</div>
+  </div>
+</div>
+
+{{range $p.Tiers}}
+<div class="card tier-card">
+  <div class="card-head">{{.Tier.Label}} <span class="chip chip-{{.Status}}">{{.Status}}</span>
+    {{if .URL}}<span class="grow"></span><a class="mono" href="{{derefStr .URL}}">{{derefStr .URL}}</a>{{end}}
+  </div>
+
+  <form method="post" action="/posts/{{$p.ID}}/tier" class="stack">
+    <input type="hidden" name="tier" value="{{.Tier}}">
+    <input type="hidden" name="action" value="draft">
+    <textarea name="content" rows="3" placeholder="draft {{.Tier.Label}} content…">{{.Content}}</textarea>
+    <button class="btn-ghost" type="submit">save draft</button>
+  </form>
+
+  <form method="post" action="/posts/{{$p.ID}}/tier" class="inline-form">
+    <input type="hidden" name="tier" value="{{.Tier}}">
+    <input type="hidden" name="action" value="publish">
+    <input type="url" name="url" placeholder="published URL (required)" value="{{derefStr .URL}}" required>
+    <button class="btn" type="submit">mark published</button>
+  </form>
+
+  {{if eq .Tier "linkedin"}}
+  <form method="post" action="/posts/{{$p.ID}}/tier" class="inline-form">
+    <input type="hidden" name="tier" value="{{.Tier}}">
+    <input type="hidden" name="action" value="visual">
+    <select name="visual_kind">
+      <option value="none" {{if eq .VisualKind "none"}}selected{{end}}>no visual</option>
+      <option value="adr" {{if eq .VisualKind "adr"}}selected{{end}}>ADR</option>
+      <option value="diagram" {{if eq .VisualKind "diagram"}}selected{{end}}>data-flow diagram</option>
+      <option value="screenshot" {{if eq .VisualKind "screenshot"}}selected{{end}}>screenshot</option>
+    </select>
+    <select name="adr_id">
+      <option value="0">— link ADR —</option>
+      {{range $.ADRs}}<option value="{{.ID}}">ADR-{{.Number}}: {{.Title}}</option>{{end}}
+    </select>
+    <button class="btn-ghost" type="submit">set visual</button>
+  </form>
+  <div class="muted">Tip: prefer an ADR or animated data-flow diagram over a flat screenshot.</div>
+  {{end}}
+</div>
+{{end}}
+{{end}}

@@ -1,0 +1,38 @@
+{{define "content"}}
+<div class="toolbar">
+  <span class="muted">30-day cadence:</span> <span class="mono">{{pct .Rate}}</span>
+  <span class="grow"></span>
+  <a class="btn" href="/new#post">+ new post</a>
+</div>
+
+<div class="card">
+  <div class="card-head">Posting heatmap · 90 days</div>
+  <div class="heatmap">
+    {{range .Heatmap}}
+      <span class="hcell h{{.Published}} {{if .IsBufferDay}}hbuf{{end}}" title="{{.Date}} · {{.Published}} published{{if .IsBufferDay}} · buffer{{end}}"></span>
+    {{end}}
+  </div>
+  <div class="legend"><span class="muted">less</span>
+    <span class="hcell h0"></span><span class="hcell h1"></span><span class="hcell h2"></span><span class="hcell h3"></span>
+    <span class="muted">more</span> <span class="hcell hbuf"></span><span class="muted">buffer (Fri)</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">Posts</div>
+  <table class="table">
+    <thead><tr><th>date</th><th>type</th><th>title</th></tr></thead>
+    <tbody>
+    {{range .Posts}}
+      <tr onclick="location='/posts/{{.ID}}'">
+        <td class="mono">{{.PostDate}}</td>
+        <td><span class="tag">{{.PostType}}</span></td>
+        <td>{{if .Title}}{{.Title}}{{else}}<span class="muted">(untitled)</span>{{end}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="3" class="muted">No posts yet.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

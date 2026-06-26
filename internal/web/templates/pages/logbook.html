@@ -1,0 +1,25 @@
+{{define "content"}}
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head">Career events</div>
+    <div class="logstream">
+      {{range .Events}}
+        <div class="logline"><span class="mono muted">{{timeShort .OccurredAt}}</span>
+          <span class="tag">{{.Kind}}</span> {{.Summary}} <span class="muted">[{{.Source}}]</span></div>
+      {{else}}
+        <div class="muted">No events yet.</div>
+      {{end}}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head">Build logs</div>
+    <div class="logstream">
+      {{range .Logs}}
+        <div class="logline"><span class="mono muted">{{.LogDate}}</span> {{.WorkedOn}}{{if .Insight}} — <span class="muted">{{.Insight}}</span>{{end}}</div>
+      {{else}}
+        <div class="muted">No build logs yet.</div>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}

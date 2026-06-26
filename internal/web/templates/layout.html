@@ -1,0 +1,55 @@
+{{define "base"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · local-scava</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot dot-ok"></span> local-scava</div>
+    <nav>
+      <div class="nav-group">Watch</div>
+      <a href="/" class="nav-item {{if eq .Nav "overview"}}active{{end}}">Overview</a>
+      <a href="/metrics" class="nav-item {{if eq .Nav "metrics"}}active{{end}}">Metrics</a>
+      <div class="nav-group">Sprints</div>
+      <a href="/sprints" class="nav-item {{if eq .Nav "sprints"}}active{{end}}">Sprints</a>
+      <a href="/adrs" class="nav-item {{if eq .Nav "adrs"}}active{{end}}">ADRs</a>
+      <div class="nav-group">Cadence</div>
+      <a href="/cadence" class="nav-item {{if eq .Nav "cadence"}}active{{end}}">Cadence</a>
+      <a href="/logs" class="nav-item {{if eq .Nav "logbook"}}active{{end}}">Logbook</a>
+      <div class="nav-group">Act</div>
+      <a href="/new" class="nav-item {{if eq .Nav "new"}}active{{end}}">New entry</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div>v0.1.0-dev</div>
+      <div class="muted">monochrome SRE console</div>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <span class="dot dot-ok"></span><span class="muted">daemon ok</span>
+    <span class="sep">·</span>
+    <span class="muted">today:</span> <span class="mono">{{.Today}}</span>
+    <span class="grow"></span>
+    <button class="btn-ghost" onclick="document.body.classList.toggle('chat-open')">chat ▸</button>
+  </header>
+
+  <main class="main">
+    <h1 class="page-title">{{.Title}}</h1>
+    {{template "content" .}}
+  </main>
+
+  <section class="chat-drawer">
+    <div class="chat-head"><span class="dot" id="ws-dot"></span> kiro-cli bridge <span class="grow"></span>
+      <button class="btn-ghost" onclick="document.body.classList.remove('chat-open')">×</button>
+    </div>
+    <div class="chat-log" id="chat-log"><div class="muted mono">Chat bridge connects in a later layer.</div></div>
+    <form class="chat-input" onsubmit="return false;">
+      <span class="prompt">▸</span><input type="text" placeholder="talk to kiro-cli…" disabled>
+    </form>
+  </section>
+</body>
+</html>{{end}}

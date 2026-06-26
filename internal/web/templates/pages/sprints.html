@@ -1,0 +1,22 @@
+{{define "content"}}
+<div class="toolbar"><a class="btn" href="/new#sprint">+ new sprint</a></div>
+
+{{if .Sprints}}
+<div class="grid grid-3 sprint-grid">
+  {{range .Sprints}}
+  <a class="card sprint-cell {{if eq .Status "shipped"}}cell-shipped{{end}}" href="/sprints/{{.ID}}">
+    <div class="muted mono">{{.MonthLabel}}</div>
+    <div class="cell-skill">{{.SkillName}}</div>
+    <div class="muted">{{.MicroappOneLiner}}</div>
+    <div class="cell-foot">
+      <span class="tag tag-{{.Status}}">{{.Status}}</span>
+      {{if .LiveURL}}<span class="mono">●</span>{{else}}<span class="mono muted">○</span>{{end}}
+      <span class="muted">P{{.CurrentPhase}}</span>
+    </div>
+  </a>
+  {{end}}
+</div>
+{{else}}
+<div class="card"><p class="muted">No sprints yet. The 12-months-12-projects grid fills in here.</p></div>
+{{end}}
+{{end}}

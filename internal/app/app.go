@@ -12,6 +12,7 @@ import (
 
 	"github.com/paulkinyatti/local-scava/internal/service"
 	"github.com/paulkinyatti/local-scava/internal/store"
+	"github.com/paulkinyatti/local-scava/internal/web"
 )
 
 // App is the assembled daemon: config, logger, store, service, and HTTP server.
@@ -20,6 +21,7 @@ type App struct {
 	log    *slog.Logger
 	store  *store.Store
 	svc    *service.Service
+	web    *web.Handlers
 	server *http.Server
 }
 
@@ -40,7 +42,13 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 
 	svc := service.New(st)
 
-	a := &App{cfg: cfg, log: log, store: st, svc: svc}
+	webHandlers, err := web.New(svc, log)
+	if err != nil {
+		_ = st.Close()
+		return nil, err
+	}
+
+	a := &App{cfg: cfg, log: log, store: st, svc: svc, web: webHandlers}
 	a.server = &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           a.routes(),
@@ -60,6 +68,7 @@ func (a *App) Logger() *slog.Logger { return a.log }
 func (a *App) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", a.handleHealthz)
+	a.web.Mount(mux)
 	return mux
 }
 
