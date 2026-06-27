@@ -1,15 +1,37 @@
 {{define "content"}}
 {{$s := .Sprint}}
-<div class="card">
+<div class="card sprint-hero">
   <div class="sprint-head">
-    <div><strong>{{$s.SkillName}}</strong> — {{$s.MicroappOneLiner}}</div>
-    <div class="muted mono">{{$s.MonthLabel}} · {{$s.Status}}{{if $s.DeployPlatform}} · {{$s.DeployPlatform}}{{end}}</div>
+    <div>
+      <span class="sprint-skill-name">{{$s.SkillName}}</span>
+      <span class="sprint-one-liner">{{$s.MicroappOneLiner}}</span>
+    </div>
+    <div class="sprint-meta">
+      <span class="tag {{if eq $s.Status "active"}}tag-active{{else if eq $s.Status "shipped"}}tag-shipped{{end}}">{{$s.Status}}</span>
+      <span class="mono muted">{{$s.MonthLabel}}</span>
+      {{if $s.DeployPlatform}}<span class="mono muted">{{$s.DeployPlatform}}</span>{{end}}
+    </div>
   </div>
-  {{if $s.LiveURL}}<div>live: <a href="{{derefStr $s.LiveURL}}">{{derefStr $s.LiveURL}}</a></div>{{end}}
-  <div class="kv"><span class="muted">why:</span> {{$s.SkillRationale}}</div>
-  <div class="kv"><span class="muted">core feature:</span> {{$s.CoreFeature}}</div>
-  <div class="kv"><span class="muted">out of scope:</span> {{$s.OutOfScope}}</div>
+  {{if $s.LiveURL}}<div class="sprint-live-url"><span class="muted">live:</span> <a href="{{derefStr $s.LiveURL}}">{{derefStr $s.LiveURL}}</a></div>{{end}}
+</div>
 
+<div class="grid grid-3 sprint-details-grid">
+  <div class="card">
+    <div class="card-head">Why</div>
+    <p class="sprint-detail-text">{{$s.SkillRationale}}</p>
+  </div>
+  <div class="card">
+    <div class="card-head">Core Feature</div>
+    <p class="sprint-detail-text">{{$s.CoreFeature}}</p>
+  </div>
+  <div class="card">
+    <div class="card-head">Out of Scope</div>
+    <p class="sprint-detail-text">{{$s.OutOfScope}}</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">Phase Progress</div>
   <div class="stepper">
     {{$cur := $s.CurrentPhase}}
     {{range phases}}
@@ -34,14 +56,14 @@
 </div>
 
 <div class="card">
-  <div class="card-head">Sprint trace <span class="muted">— phases as spans, width ∝ time spent</span></div>
+  <div class="card-head">Sprint Trace <span class="muted">— phases as spans, width ∝ time spent</span></div>
   <div class="chart-wrap trace-wrap">{{trace .Trace}}</div>
   <div class="muted mono trace-legend">open span = current phase · fill intensity ∝ checklist completion</div>
 </div>
 
 <div class="grid grid-2">
   <div class="card">
-    <div class="card-head">Phase checklist</div>
+    <div class="card-head">Phase Checklist</div>
     {{range phases}}
       {{$phase := .}}
       <div class="check-phase">{{.}} · {{phaseLabel .}}</div>
@@ -56,7 +78,7 @@
   </div>
 
   <div class="card">
-    <div class="card-head">Daily logs</div>
+    <div class="card-head">Daily Logs</div>
     <form method="post" action="/logs" class="stack">
       <input type="hidden" name="sprint_id" value="{{$s.ID}}">
       <input type="text" name="worked_on" placeholder="what I worked on (required)" required>

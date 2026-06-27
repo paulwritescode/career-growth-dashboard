@@ -4,8 +4,12 @@
     <div class="card-head">Career events</div>
     <div class="logstream">
       {{range .Events}}
-        <div class="logline"><span class="mono muted">{{timeShort .OccurredAt}}</span>
-          <span class="tag">{{.Kind}}</span> {{.Summary}} <span class="muted">[{{.Source}}]</span></div>
+        <div class="logline">
+          <span class="mono muted">{{timeShort .OccurredAt}}</span>
+          <span class="tag tag-event tag-event-{{.Kind}}">{{.Kind}}</span>
+          <span>{{.Summary}}</span>
+          <span class="tag tag-source tag-source-{{.Source}}">{{.Source}}</span>
+        </div>
       {{else}}
         <div class="muted">No events yet.</div>
       {{end}}
@@ -15,7 +19,12 @@
     <div class="card-head">Build logs</div>
     <div class="logstream">
       {{range .Logs}}
-        <div class="logline"><span class="mono muted">{{.LogDate}}</span> {{.WorkedOn}}{{if .Insight}} — <span class="muted">{{.Insight}}</span>{{end}}</div>
+        <div class="logline">
+          <span class="mono muted">{{.LogDate}}</span>
+          <span>{{.WorkedOn}}</span>
+          {{if .Insight}}<span class="muted">— {{.Insight}}</span>{{end}}
+          {{if .Blocker}}<span class="tag tag-blocker">blocker</span>{{end}}
+        </div>
       {{else}}
         <div class="muted">No build logs yet.</div>
       {{end}}

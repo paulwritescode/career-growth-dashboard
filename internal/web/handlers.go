@@ -17,6 +17,7 @@ type pageBase struct {
 	Today       string
 	Flash       string
 	HasActive   bool   // an active sprint exists (for the top status bar)
+	ActiveID    int64  // active sprint's ID (for linking)
 	ActiveSkill string // active sprint's skill name
 	ActivePhase int    // active sprint's current phase number
 }
@@ -25,6 +26,7 @@ func (h *Handlers) base(title, nav string) pageBase {
 	pb := pageBase{Title: title, Nav: nav, Today: h.svc.Today()}
 	if sp, err := h.svc.CurrentSprint(context.Background()); err == nil {
 		pb.HasActive = true
+		pb.ActiveID = sp.ID
 		pb.ActiveSkill = sp.SkillName
 		pb.ActivePhase = int(sp.CurrentPhase)
 	}
