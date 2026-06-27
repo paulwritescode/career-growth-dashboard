@@ -46,11 +46,20 @@
   <div class="card-head">Phase Progress</div>
   <div class="stepper">
     {{$cur := $s.CurrentPhase}}
+    {{$next := phaseNext $cur}}
     {{range phases}}
-      <form method="post" action="/sprints/{{$s.ID}}/phase" class="step-form">
-        <input type="hidden" name="phase" value="{{.}}">
-        <button class="step {{if eq . $cur}}step-current{{else if lt . $cur}}step-done{{end}}" type="submit">{{.}} {{phaseLabel .}}</button>
-      </form>
+      {{if eq . $cur}}
+        <div class="step step-current">{{.}} {{phaseLabel .}}</div>
+      {{else if lt . $cur}}
+        <div class="step step-done">{{.}} {{phaseLabel .}}</div>
+      {{else if eq . $next}}
+        <form method="post" action="/sprints/{{$s.ID}}/phase" class="step-form">
+          <input type="hidden" name="phase" value="{{.}}">
+          <button class="step step-next" type="submit" title="Advance to {{phaseLabel .}}">{{.}} {{phaseLabel .}} →</button>
+        </form>
+      {{else}}
+        <div class="step step-future">{{.}} {{phaseLabel .}}</div>
+      {{end}}
     {{end}}
   </div>
   <div class="health health-{{.Health}}">

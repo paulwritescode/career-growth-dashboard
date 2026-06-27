@@ -37,24 +37,31 @@ func TestSprintTracePhaseSpans(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SprintTrace: %v", err)
 	}
-	if len(spans) != 3 {
-		t.Fatalf("expected 3 phase spans, got %d", len(spans))
+	// Always returns 4 spans (one per canonical phase). Phase 4 not yet entered
+	// will have zero duration.
+	if len(spans) != 4 {
+		t.Fatalf("expected 4 phase spans (canonical), got %d", len(spans))
 	}
-	if spans[0].Phase != domain.PhaseScopeDeclare || spans[1].Phase != domain.PhaseBuild || spans[2].Phase != domain.PhasePolishDocument {
+	if spans[0].Phase != domain.PhaseScopeDeclare || spans[1].Phase != domain.PhaseBuild || spans[2].Phase != domain.PhasePolishDocument || spans[3].Phase != domain.PhaseDeployShowcase {
 		t.Fatalf("unexpected phase ordering: %+v", spans)
 	}
+	// Phase 3 (Polish) is the current open span since we're still active there.
 	if !spans[2].IsCurrent {
-		t.Fatalf("expected last span to be the current/open phase")
+		t.Fatalf("expected Polish span (index 2) to be the current/open phase")
 	}
 	if spans[0].IsCurrent {
 		t.Fatalf("first span should not be current")
 	}
-	// Widths should sum to ~100.
+	// Phase 4 not entered yet should have zero duration.
+	if spans[3].Duration != 0 {
+		t.Fatalf("expected Deploy&Showcase to have 0 duration (not entered), got %v", spans[3].Duration)
+	}
+	// Widths of entered phases should sum to ~100.
 	var sum float64
 	for _, s := range spans {
 		sum += s.WidthPct
-		if s.Duration <= 0 {
-			t.Fatalf("phase %d has non-positive duration", s.Phase)
+		if s.Phase <= domain.PhasePolishDocument && s.Duration <= 0 {
+			t.Fatalf("entered phase %d has non-positive duration", s.Phase)
 		}
 	}
 	if sum < 99.5 || sum > 100.5 {

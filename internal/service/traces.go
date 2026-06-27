@@ -27,9 +27,10 @@ type PhaseSpan struct {
 
 // SprintTrace reconstructs a sprint as a left-to-right waterfall of phase
 // spans, with each span's width proportional to the time spent in that phase
-// (spec 09 — "a sprint traced through its four phases"). Phase boundaries come
-// from sprint.created (phase 1 start) and sprint.phase_changed events; the
-// final span is open until ended_on/now.
+// (spec 09 — "a sprint traced through its four phases"). Always produces exactly
+// 4 spans (one per canonical phase). Phase boundaries come from sprint.created
+// (phase 1 start) and sprint.phase_changed events; the final span is open until
+// ended_on/now.
 func (s *Service) SprintTrace(ctx context.Context, sprintID int64) ([]PhaseSpan, error) {
 	sp, err := s.store.GetSprint(ctx, sprintID)
 	if err != nil {
@@ -41,8 +42,7 @@ func (s *Service) SprintTrace(ctx context.Context, sprintID int64) ([]PhaseSpan,
 	}
 
 	// Build phase boundaries: (phase, startedAt) in chronological order. Phase 1
-	// begins when the sprint was created. Prefer the sprint.created event time
-	// (recorded with the service clock) and fall back to the row's created_at.
+	// begins when the sprint was created.
 	type boundary struct {
 		phase domain.Phase
 		at    time.Time
@@ -54,7 +54,12 @@ func (s *Service) SprintTrace(ctx context.Context, sprintID int64) ([]PhaseSpan,
 			break
 		}
 	}
-	bounds := []boundary{{phase: domain.PhaseScopeDeclare, at: phase1Start}}
+
+	// Collect unique phase start times. If a phase was entered multiple times,
+	// keep the first entry time (the phase "started" the first time you entered it).
+	phaseStart := map[domain.Phase]time.Time{
+		domain.PhaseScopeDeclare: phase1Start,
+	}
 	for _, e := range events {
 		if e.Kind != "sprint.phase_changed" {
 			continue
@@ -66,22 +71,24 @@ func (s *Service) SprintTrace(ctx context.Context, sprintID int64) ([]PhaseSpan,
 		if err := json.Unmarshal([]byte(e.Detail), &d); err != nil || d.To == 0 {
 			continue
 		}
-		bounds = append(bounds, boundary{phase: domain.Phase(d.To), at: e.OccurredAt})
+		toPhase := domain.Phase(d.To)
+		if _, exists := phaseStart[toPhase]; !exists {
+			phaseStart[toPhase] = e.OccurredAt
+		}
 	}
 
 	// Trace end: ended_on for finished sprints, else now.
 	end := s.now().UTC()
 	if (sp.Status == domain.SprintShipped || sp.Status == domain.SprintAbandoned) && sp.EndedOn != nil {
 		if t, perr := time.Parse("2006-01-02", *sp.EndedOn); perr == nil {
-			// Use end-of-day so a same-day ship still shows a non-zero span.
 			et := t.Add(24*time.Hour - time.Second)
-			if et.After(bounds[len(bounds)-1].at) {
+			if et.After(phase1Start) {
 				end = et
 			}
 		}
 	}
 
-	// Checklist completion per phase (the span's "health" colour).
+	// Checklist completion per phase.
 	items, err := s.store.ListChecklist(ctx, sprintID)
 	if err != nil {
 		return nil, err
@@ -95,35 +102,58 @@ func (s *Service) SprintTrace(ctx context.Context, sprintID int64) ([]PhaseSpan,
 		}
 	}
 
-	// Materialize spans from consecutive boundaries.
-	spans := make([]PhaseSpan, 0, len(bounds))
+	// Build exactly 4 spans — one per canonical phase. Phases not yet entered
+	// get zero duration. Each phase ends where the next begins, or at `end` for
+	// the current/last phase.
+	allPhases := domain.AllPhases()
+	spans := make([]PhaseSpan, 0, 4)
 	var totalDur time.Duration
-	for i, b := range bounds {
+
+	for i, phase := range allPhases {
+		startAt, entered := phaseStart[phase]
+		if !entered {
+			// Phase not entered yet: zero-duration span
+			spans = append(spans, PhaseSpan{
+				Phase:        phase,
+				Label:        phase.Label(),
+				Duration:     0,
+				DurationText: "—",
+				DoneGates:    done[phase],
+				TotalGates:   total[phase],
+				IsCurrent:    false,
+			})
+			continue
+		}
+
+		// Phase ends when the next entered phase begins, or at `end`.
 		spanEnd := end
-		if i+1 < len(bounds) {
-			spanEnd = bounds[i+1].at
+		for j := i + 1; j < len(allPhases); j++ {
+			if nextStart, ok := phaseStart[allPhases[j]]; ok {
+				spanEnd = nextStart
+				break
+			}
 		}
-		if spanEnd.Before(b.at) {
-			spanEnd = b.at
+		if spanEnd.Before(startAt) {
+			spanEnd = startAt
 		}
-		dur := spanEnd.Sub(b.at)
+
+		dur := spanEnd.Sub(startAt)
 		totalDur += dur
 		spans = append(spans, PhaseSpan{
-			Phase:        b.phase,
-			Label:        b.phase.Label(),
-			StartedAt:    b.at,
+			Phase:        phase,
+			Label:        phase.Label(),
+			StartedAt:    startAt,
 			EndedAt:      spanEnd,
 			Duration:     dur,
 			DurationText: humanDuration(dur),
-			DoneGates:    done[b.phase],
-			TotalGates:   total[b.phase],
-			IsCurrent:    i == len(bounds)-1 && sp.Status == domain.SprintActive,
+			DoneGates:    done[phase],
+			TotalGates:   total[phase],
+			IsCurrent:    phase == sp.CurrentPhase && sp.Status == domain.SprintActive,
 		})
 	}
 
 	// Compute offset/width percentages across the full trace duration.
 	if totalDur <= 0 {
-		// Degenerate (everything in one instant): equal widths.
 		w := 100.0 / float64(len(spans))
 		for i := range spans {
 			spans[i].OffsetPct = float64(i) * w

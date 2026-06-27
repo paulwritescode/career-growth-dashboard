@@ -142,19 +142,31 @@ func sprintTraceSVG(spans []service.PhaseSpan) template.HTML {
 		y := pad + i*(rowH+gap)
 		x := float64(labelW+pad) + track*sp.OffsetPct/100
 		bw := track * sp.WidthPct / 100
-		if bw < 2 {
-			bw = 2
+
+		// Phase label always shown
+		fmt.Fprintf(&b, `<text x="%d" y="%d" class="chart-label">%d · %s</text>`, pad, y+rowH/2+4, int(sp.Phase), sp.Label)
+
+		// Zero-duration phases (not yet entered) — show a dashed outline
+		if sp.Duration == 0 {
+			fmt.Fprintf(&b, `<rect x="%.1f" y="%d" width="%.1f" height="%d" fill="none" stroke="var(--line)" stroke-dasharray="4 2"/>`,
+				float64(labelW+pad), y, track*0.15, rowH)
+			fmt.Fprintf(&b, `<text x="%.1f" y="%d" class="chart-label trace-ann">not started · %d/%d</text>`,
+				float64(labelW+pad)+4, y+rowH/2+4, sp.DoneGates, sp.TotalGates)
+			continue
+		}
+
+		if bw < 4 {
+			bw = 4
 		}
 		fillOpacity := 0.35
 		if sp.TotalGates > 0 {
 			fillOpacity = 0.35 + 0.6*float64(sp.DoneGates)/float64(sp.TotalGates)
 		}
-		fmt.Fprintf(&b, `<text x="%d" y="%d" class="chart-label">%d · %s</text>`, pad, y+rowH/2+4, int(sp.Phase), sp.Label)
 		if sp.IsCurrent {
-			fmt.Fprintf(&b, `<rect x="%.1f" y="%d" width="%.1f" height="%d" fill="url(#hatch)" stroke="var(--fg-0)" stroke-width="1"/>`,
+			fmt.Fprintf(&b, `<rect x="%.1f" y="%d" width="%.1f" height="%d" fill="url(#hatch)" stroke="var(--green)" stroke-width="1.5"/>`,
 				x, y, bw, rowH)
 		} else {
-			fmt.Fprintf(&b, `<rect x="%.1f" y="%d" width="%.1f" height="%d" fill="currentColor" fill-opacity="%.2f" stroke="var(--line)"/>`,
+			fmt.Fprintf(&b, `<rect x="%.1f" y="%d" width="%.1f" height="%d" fill="var(--green)" fill-opacity="%.2f" stroke="var(--line)"/>`,
 				x, y, bw, rowH, fillOpacity)
 		}
 		fmt.Fprintf(&b, `<text x="%.1f" y="%d" class="chart-label trace-ann">%s · %d/%d</text>`,

@@ -111,6 +111,7 @@ func funcMap() template.FuncMap {
 		},
 		"timeShort":  func(t time.Time) string { return t.Local().Format("2006-01-02 15:04") },
 		"add":        func(a, b int) int { return a + b },
+		"phaseNext":  func(p domain.Phase) domain.Phase { return p + 1 },
 		"title":      func(s string) string { return s },
 		"phaseLabel": func(p domain.Phase) string { return p.Label() },
 		"sparkline":  sparklineSVG,
