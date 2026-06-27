@@ -1,5 +1,6 @@
 {{define "content"}}
 {{$s := .Sprint}}
+<!-- Hero: skill name + status -->
 <div class="card sprint-hero">
   <div class="sprint-head">
     <div>
@@ -7,29 +8,40 @@
       <span class="sprint-one-liner">{{$s.MicroappOneLiner}}</span>
     </div>
     <div class="sprint-meta">
-      <span class="tag {{if eq $s.Status "active"}}tag-active{{else if eq $s.Status "shipped"}}tag-shipped{{end}}">{{$s.Status}}</span>
+      <span class="tag tag-status tag-status-{{$s.Status}}">{{$s.Status}}</span>
       <span class="mono muted">{{$s.MonthLabel}}</span>
-      {{if $s.DeployPlatform}}<span class="mono muted">{{$s.DeployPlatform}}</span>{{end}}
+      {{if $s.DeployPlatform}}<span class="tag tag-platform">{{$s.DeployPlatform}}</span>{{end}}
     </div>
   </div>
   {{if $s.LiveURL}}<div class="sprint-live-url"><span class="muted">live:</span> <a href="{{derefStr $s.LiveURL}}">{{derefStr $s.LiveURL}}</a></div>{{end}}
 </div>
 
+<!-- Why / Core Feature / Out of Scope -->
 <div class="grid grid-3 sprint-details-grid">
-  <div class="card">
-    <div class="card-head">Why</div>
+  <div class="card sprint-info-card">
+    <div class="card-head">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Why
+    </div>
     <p class="sprint-detail-text">{{$s.SkillRationale}}</p>
   </div>
-  <div class="card">
-    <div class="card-head">Core Feature</div>
+  <div class="card sprint-info-card">
+    <div class="card-head">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+      Core Feature
+    </div>
     <p class="sprint-detail-text">{{$s.CoreFeature}}</p>
   </div>
-  <div class="card">
-    <div class="card-head">Out of Scope</div>
+  <div class="card sprint-info-card">
+    <div class="card-head">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+      Out of Scope
+    </div>
     <p class="sprint-detail-text">{{$s.OutOfScope}}</p>
   </div>
 </div>
 
+<!-- Phase Progress -->
 <div class="card">
   <div class="card-head">Phase Progress</div>
   <div class="stepper">
@@ -41,9 +53,12 @@
       </form>
     {{end}}
   </div>
-  <div class="health health-{{.Health}}">phase health: {{.Health}} ({{.Unchecked}} unchecked in current phase)</div>
+  <div class="health health-{{.Health}}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    phase health: {{.Health}} ({{.Unchecked}} unchecked)
+  </div>
 
-  <form method="post" action="/sprints/{{$s.ID}}/status" class="inline-form">
+  <form method="post" action="/sprints/{{$s.ID}}/status" class="sprint-status-form">
     <select name="status">
       <option value="planned" {{if eq $s.Status "planned"}}selected{{end}}>planned</option>
       <option value="active" {{if eq $s.Status "active"}}selected{{end}}>active</option>
@@ -51,21 +66,22 @@
       <option value="abandoned" {{if eq $s.Status "abandoned"}}selected{{end}}>abandoned</option>
     </select>
     <input type="url" name="live_url" placeholder="live URL (required to ship)" value="{{derefStr $s.LiveURL}}">
-    <button class="btn" type="submit">update status</button>
+    <button class="btn btn-primary" type="submit">update status</button>
   </form>
 </div>
 
+<!-- Sprint Trace -->
 <div class="card">
   <div class="card-head">Sprint Trace <span class="muted">— phases as spans, width ∝ time spent</span></div>
   <div class="chart-wrap trace-wrap">{{trace .Trace}}</div>
   <div class="muted mono trace-legend">open span = current phase · fill intensity ∝ checklist completion</div>
 </div>
 
+<!-- Checklist + Logs -->
 <div class="grid grid-2">
   <div class="card">
     <div class="card-head">Phase Checklist</div>
     {{range phases}}
-      {{$phase := .}}
       <div class="check-phase">{{.}} · {{phaseLabel .}}</div>
       {{range index $.Checklist .}}
         <form method="post" action="/checklist/{{.ID}}/toggle" class="check-row">
@@ -83,7 +99,7 @@
       <input type="hidden" name="sprint_id" value="{{$s.ID}}">
       <input type="text" name="worked_on" placeholder="what I worked on (required)" required>
       <input type="text" name="insight" placeholder="the fix / insight / decision">
-      <button class="btn" type="submit">log entry</button>
+      <button class="btn btn-primary" type="submit">log entry</button>
     </form>
     <div class="logstream">
       {{range .Logs}}
@@ -95,6 +111,7 @@
   </div>
 </div>
 
+<!-- Retro -->
 <div class="card">
   <div class="card-head">Retro</div>
   <form method="post" action="/sprints/{{$s.ID}}/retro" class="stack">
@@ -102,7 +119,7 @@
     <input type="text" name="retro_differently" placeholder="what I'd do differently" value="{{$s.RetroDifferently}}">
     <input type="text" name="retro_learned" placeholder="top things learned" value="{{$s.RetroLearned}}">
     <input type="url" name="retro_live_link" placeholder="live link" value="{{$s.RetroLiveLink}}">
-    <button class="btn" type="submit">save retro</button>
+    <button class="btn btn-secondary" type="submit">save retro</button>
   </form>
 </div>
 {{end}}

@@ -133,6 +133,14 @@ body.sidebar-collapsed .main{margin-left:56px}
   border-radius:var(--r-pill); transition:opacity .15s, transform .1s}
 .btn:hover{text-decoration:none; opacity:.9; transform:translateY(-1px)}
 .btn:active{opacity:.85; transform:translateY(0)}
+.btn-primary{background:var(--blue); color:#fff; border-color:var(--blue)}
+.btn-primary:hover{background:#4a85e0; border-color:#4a85e0}
+.btn-secondary{background:transparent; color:var(--fg-1); border:1px solid var(--line)}
+.btn-secondary:hover{background:var(--bg-2); border-color:var(--fg-2)}
+.btn-danger{background:var(--red); color:#fff; border-color:var(--red)}
+.btn-danger:hover{background:#d43f52}
+.btn-success{background:var(--green); color:#0B0B0C; border-color:var(--green)}
+.btn-success:hover{background:#4ac04e}
 .btn-ghost{background:transparent; color:var(--fg-1); border:1px solid var(--line);
   padding:8px 16px; cursor:pointer; font-size:14px; font-weight:500;
   border-radius:var(--r-pill); transition:background .15s, border-color .15s}
@@ -528,13 +536,25 @@ body.sidebar-collapsed .running-phase{opacity:0; width:0; overflow:hidden}
 .topbar-active:hover{text-decoration:underline; color:var(--green)}
 
 /* --- Sprint detail page -------------------------------------------------- */
-.sprint-hero{margin-bottom:var(--sp-base)}
-.sprint-skill-name{font-size:20px; font-weight:700; color:var(--fg-0); display:block}
-.sprint-one-liner{font-size:14px; color:var(--fg-2); display:block; margin-top:var(--sp-xxs)}
-.sprint-meta{display:flex; gap:var(--sp-xs); align-items:center; margin-top:var(--sp-xs)}
+.sprint-hero{margin-bottom:var(--sp-lg)}
+.sprint-skill-name{font-size:22px; font-weight:700; color:var(--fg-0); display:block}
+.sprint-one-liner{font-size:14px; color:var(--fg-2); display:block; margin-top:var(--sp-xs)}
+.sprint-meta{display:flex; gap:var(--sp-xs); align-items:center; margin-top:var(--sp-sm)}
 .sprint-live-url{margin-top:var(--sp-sm); font-size:13px}
-.sprint-details-grid{margin-bottom:var(--sp-base)}
-.sprint-detail-text{color:var(--fg-1); font-size:13px; line-height:1.5; margin:0}
+.sprint-details-grid{margin-bottom:var(--sp-lg)}
+.sprint-detail-text{color:var(--fg-1); font-size:13px; line-height:1.6; margin:0}
+.sprint-info-card{padding:var(--sp-lg)}
+.sprint-status-form{display:flex; gap:var(--sp-xs); align-items:center; flex-wrap:wrap; margin-top:var(--sp-base)}
+
+/* Sprint status tags — Grafana color coding */
+.tag-status{font-size:11px; padding:3px 10px; border-radius:var(--r-pill); font-weight:600;
+  text-transform:uppercase; letter-spacing:.04em}
+.tag-status-active{background:rgba(86,208,90,0.15); color:var(--green); border-color:rgba(86,208,90,0.4)}
+.tag-status-shipped{background:rgba(87,148,242,0.15); color:var(--blue); border-color:rgba(87,148,242,0.4)}
+.tag-status-planned{background:rgba(250,222,42,0.12); color:var(--yellow); border-color:rgba(250,222,42,0.3)}
+.tag-status-abandoned{background:rgba(242,73,92,0.12); color:var(--red); border-color:rgba(242,73,92,0.3)}
+.tag-platform{font-size:11px; padding:2px 8px; border-radius:var(--r-pill); background:rgba(163,82,204,0.12);
+  color:var(--purple); border-color:rgba(163,82,204,0.3)}
 
 /* More card spacing on sprint detail */
 .sprint-details-grid .card{padding:var(--sp-lg)}
