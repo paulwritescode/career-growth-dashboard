@@ -104,13 +104,18 @@ func (s *Service) SprintTrace(ctx context.Context, sprintID int64) ([]PhaseSpan,
 
 	// Build exactly 4 spans — one per canonical phase. Phases not yet entered
 	// get zero duration. Each phase ends where the next begins, or at `end` for
-	// the current/last phase.
+	// the current/last phase. Only phases up to the sprint's current phase are
+	// considered "entered" — stale events from phase-jumping are ignored.
 	allPhases := domain.AllPhases()
 	spans := make([]PhaseSpan, 0, 4)
 	var totalDur time.Duration
 
 	for i, phase := range allPhases {
 		startAt, entered := phaseStart[phase]
+		// Ignore phase entries beyond the sprint's current phase (stale jumps)
+		if entered && phase > sp.CurrentPhase {
+			entered = false
+		}
 		if !entered {
 			// Phase not entered yet: zero-duration span
 			spans = append(spans, PhaseSpan{
@@ -128,7 +133,9 @@ func (s *Service) SprintTrace(ctx context.Context, sprintID int64) ([]PhaseSpan,
 		// Phase ends when the next entered phase begins, or at `end`.
 		spanEnd := end
 		for j := i + 1; j < len(allPhases); j++ {
-			if nextStart, ok := phaseStart[allPhases[j]]; ok {
+			nextPhase := allPhases[j]
+			// Only consider phases up to current as valid endpoints
+			if nextStart, ok := phaseStart[nextPhase]; ok && nextPhase <= sp.CurrentPhase {
 				spanEnd = nextStart
 				break
 			}
