@@ -6,16 +6,16 @@ import "time"
 // Mirrors the sprints table and sprint-plan-template.md.
 type Sprint struct {
 	ID                int64        `json:"id"`
-	MonthLabel        string       `json:"month_label"`         // "2026-07" or "Sprint 7"
-	SkillName         string       `json:"skill_name"`          // skill of the month
-	SkillRationale    string       `json:"skill_rationale"`     // why this skill / what it unlocks
-	MicroappOneLiner  string       `json:"microapp_one_liner"`  // the project, in one sentence
-	CoreFeature       string       `json:"core_feature"`        // the feature that proves the skill
-	OutOfScope        string       `json:"out_of_scope"`        // explicitly out of scope
-	DeployPlatform    string       `json:"deploy_platform"`     // Vercel/Netlify/Railway/Fly.io/Render/Other
-	CurrentPhase      Phase        `json:"current_phase"`       // 1-4
-	Status            SprintStatus `json:"status"`              // planned/active/shipped/abandoned
-	LiveURL           *string      `json:"live_url,omitempty"`  // required before status=shipped
+	MonthLabel        string       `json:"month_label"`        // "2026-07" or "Sprint 7"
+	SkillName         string       `json:"skill_name"`         // skill of the month
+	SkillRationale    string       `json:"skill_rationale"`    // why this skill / what it unlocks
+	MicroappOneLiner  string       `json:"microapp_one_liner"` // the project, in one sentence
+	CoreFeature       string       `json:"core_feature"`       // the feature that proves the skill
+	OutOfScope        string       `json:"out_of_scope"`       // explicitly out of scope
+	DeployPlatform    string       `json:"deploy_platform"`    // Vercel/Netlify/Railway/Fly.io/Render/Other
+	CurrentPhase      Phase        `json:"current_phase"`      // 1-4
+	Status            SprintStatus `json:"status"`             // planned/active/shipped/abandoned
+	LiveURL           *string      `json:"live_url,omitempty"` // required before status=shipped
 	DeclarationPostID *int64       `json:"declaration_post_id,omitempty"`
 
 	// Retro (filled after shipping).

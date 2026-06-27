@@ -4,28 +4,98 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}} · local-scava</title>
+  <!-- Inline SVG favicon (brand logo) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF9830' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5z'/%3E%3Cpath d='M2 17l10 5 10-5'/%3E%3Cpath d='M2 12l10 5 10-5'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/chat.js" defer></script>
+  <script src="/static/palette.js" defer></script>
 </head>
 <body class="app">
-  <aside class="sidebar">
-    <div class="brand"><span class="dot dot-ok"></span> local-scava</div>
-    <nav>
-      <div class="nav-group">Watch</div>
-      <a href="/" class="nav-item {{if eq .Nav "overview"}}active{{end}}">Overview</a>
-      <a href="/metrics" class="nav-item {{if eq .Nav "metrics"}}active{{end}}">Metrics</a>
-      <div class="nav-group">Sprints</div>
-      <a href="/sprints" class="nav-item {{if eq .Nav "sprints"}}active{{end}}">Sprints</a>
-      <a href="/adrs" class="nav-item {{if eq .Nav "adrs"}}active{{end}}">ADRs</a>
-      <div class="nav-group">Cadence</div>
-      <a href="/cadence" class="nav-item {{if eq .Nav "cadence"}}active{{end}}">Cadence</a>
-      <a href="/logs" class="nav-item {{if eq .Nav "logbook"}}active{{end}}">Logbook</a>
-      <div class="nav-group">Act</div>
-      <a href="/new" class="nav-item {{if eq .Nav "new"}}active{{end}}">New entry</a>
+  <aside class="sidebar" id="sidebar">
+    <!-- Brand / logo -->
+    <div class="brand">
+      <svg class="brand-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+      </svg>
+      <span class="brand-text">local-scava</span>
+    </div>
+
+    <!-- Toggle collapse button -->
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar" title="Toggle sidebar">
+      <svg class="icon-collapse" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="11 17 6 12 11 7"/>
+        <polyline points="18 17 13 12 18 7"/>
+      </svg>
+      <svg class="icon-expand" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="13 17 18 12 13 7"/>
+        <polyline points="6 17 11 12 6 7"/>
+      </svg>
+    </button>
+
+    <nav class="sidebar-nav">
+      <div class="nav-group"><span class="nav-group-text">Watch</span></div>
+      <a href="/" class="nav-item {{if eq .Nav "overview"}}active{{end}}" title="Overview">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        <span class="nav-text">Overview</span>
+      </a>
+      <a href="/metrics" class="nav-item {{if eq .Nav "metrics"}}active{{end}}" title="Metrics">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <span class="nav-text">Metrics</span>
+      </a>
+
+      <div class="nav-group"><span class="nav-group-text">Sprints</span></div>
+      <a href="/sprints" class="nav-item {{if eq .Nav "sprints"}}active{{end}}" title="Sprints">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <span class="nav-text">Sprints</span>
+      </a>
+      <a href="/adrs" class="nav-item {{if eq .Nav "adrs"}}active{{end}}" title="ADRs">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <span class="nav-text">ADRs</span>
+      </a>
+
+      <div class="nav-group"><span class="nav-group-text">Cadence</span></div>
+      <a href="/cadence" class="nav-item {{if eq .Nav "cadence"}}active{{end}}" title="Cadence">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span class="nav-text">Cadence</span>
+      </a>
+      <a href="/logs" class="nav-item {{if eq .Nav "logbook"}}active{{end}}" title="Logbook">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span class="nav-text">Logbook</span>
+      </a>
+
+      <div class="nav-group"><span class="nav-group-text">Act</span></div>
+      <a href="/new" class="nav-item {{if eq .Nav "new"}}active{{end}}" title="New entry">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        <span class="nav-text">New entry</span>
+      </a>
+      <a href="/settings" class="nav-item {{if eq .Nav "settings"}}active{{end}}" title="Settings">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span class="nav-text">Settings</span>
+      </a>
     </nav>
+
     <div class="sidebar-foot">
-      <div>v0.1.0-dev</div>
-      <div class="muted">monochrome SRE console</div>
+      <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+      </svg>
+      <span class="nav-text foot-text">v0.1.0-dev</span>
     </div>
   </aside>
 
@@ -33,23 +103,218 @@
     <span class="dot dot-ok"></span><span class="muted">daemon ok</span>
     <span class="sep">·</span>
     <span class="muted">today:</span> <span class="mono">{{.Today}}</span>
+    {{if .HasActive}}<span class="sep">·</span>
+      <span class="muted">active:</span> <span class="mono">{{.ActiveSkill}} (P{{.ActivePhase}})</span>{{end}}
     <span class="grow"></span>
-    <button class="btn-ghost" onclick="document.body.classList.toggle('chat-open')">chat ▸</button>
+    <button class="btn-ghost" onclick="window.scavaPalette&&window.scavaPalette()">⌘K</button>
   </header>
 
   <main class="main">
-    <h1 class="page-title">{{.Title}}</h1>
-    {{template "content" .}}
+    <div class="container">
+      <h1 class="page-title">{{.Title}}</h1>
+      {{template "content" .}}
+    </div>
   </main>
 
-  <section class="chat-drawer">
-    <div class="chat-head"><span class="dot" id="ws-dot"></span> kiro-cli bridge <span class="grow"></span>
-      <button class="btn-ghost" onclick="document.body.classList.remove('chat-open')">×</button>
+  <div class="palette" id="palette" aria-hidden="true">
+    <div class="palette-box" role="dialog" aria-label="quick create">
+      <input type="text" id="palette-input" placeholder="jump to or create… (type to filter)" autocomplete="off">
+      <ul class="palette-list" id="palette-list"></ul>
+      <div class="palette-foot muted mono">↑↓ to move · ↵ to open · esc to close</div>
     </div>
-    <div class="chat-log" id="chat-log"><div class="muted mono">Chat bridge connects in a later layer.</div></div>
-    <form class="chat-input" onsubmit="return false;">
-      <span class="prompt">▸</span><input type="text" placeholder="talk to kiro-cli…" disabled>
-    </form>
-  </section>
+  </div>
+
+  <!-- Floating Chat Widget -->
+  <div class="fcw" id="fcw">
+    <!-- Chat Window (hidden by default) -->
+    <div class="fcw-window" id="fcw-window">
+      <!-- Header -->
+      <div class="fcw-header">
+        <div class="fcw-header-bg"></div>
+        <div class="fcw-header-content">
+          <div class="fcw-agent-info">
+            <div class="fcw-avatar">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+              </svg>
+              <span class="fcw-status-dot"></span>
+            </div>
+            <div>
+              <div class="fcw-agent-name">kiro-cli</div>
+              <div class="fcw-agent-role">Build Assistant</div>
+            </div>
+          </div>
+          <button class="fcw-close" id="fcw-close" aria-label="Close chat">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Chat Messages -->
+      <div class="fcw-messages" id="fcw-messages">
+        <!-- Welcome message from agent -->
+        <div class="fcw-msg fcw-msg-agent">
+          <div class="fcw-msg-avatar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div class="fcw-msg-content">
+            <span class="fcw-msg-name">kiro-cli</span>
+            <div class="fcw-bubble fcw-bubble-agent">
+              <p>Hey! I'm your build assistant. What are you working on today?</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <div class="fcw-input-area">
+        <form class="fcw-form" id="fcw-form">
+          <input type="text" class="fcw-input" id="fcw-input" placeholder="Message kiro-cli..." autocomplete="off" disabled>
+          <button type="submit" class="fcw-send" id="fcw-send" disabled aria-label="Send message">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Floating Action Button -->
+    <button class="fcw-fab" id="fcw-fab" aria-label="Open chat">
+      <svg class="fcw-fab-icon-chat" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <svg class="fcw-fab-icon-close" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+
+  <script>
+  // Sidebar collapse/expand (Grafana-style)
+  (function(){
+    var toggle = document.getElementById('sidebar-toggle');
+    var KEY = 'scava-sidebar-collapsed';
+    if(localStorage.getItem(KEY)==='1'){
+      document.body.classList.add('sidebar-collapsed');
+    }
+    toggle.addEventListener('click', function(){
+      document.body.classList.toggle('sidebar-collapsed');
+      localStorage.setItem(KEY, document.body.classList.contains('sidebar-collapsed')?'1':'0');
+    });
+  })();
+
+  // Floating Chat Widget logic
+  (function(){
+    var fcw = document.getElementById('fcw');
+    var fab = document.getElementById('fcw-fab');
+    var win = document.getElementById('fcw-window');
+    var closeBtn = document.getElementById('fcw-close');
+    var form = document.getElementById('fcw-form');
+    var input = document.getElementById('fcw-input');
+    var sendBtn = document.getElementById('fcw-send');
+    var messages = document.getElementById('fcw-messages');
+    var ws = null;
+    var busy = false;
+    var agentBubble = null;
+
+    function toggleChat(){
+      var isOpen = fcw.classList.toggle('fcw-open');
+      if(isOpen && !ws) connect();
+    }
+    fab.addEventListener('click', toggleChat);
+    closeBtn.addEventListener('click', function(){ fcw.classList.remove('fcw-open'); });
+
+    function appendMsg(type, text){
+      var wrapper = document.createElement('div');
+      wrapper.className = 'fcw-msg fcw-msg-' + type;
+      if(type === 'agent'){
+        wrapper.innerHTML = '<div class="fcw-msg-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 12l10 5 10-5"/></svg></div>'
+          + '<div class="fcw-msg-content"><span class="fcw-msg-name">kiro-cli</span><div class="fcw-bubble fcw-bubble-agent"><p></p></div></div>';
+        wrapper.querySelector('p').textContent = text;
+      } else if(type === 'user'){
+        wrapper.innerHTML = '<div class="fcw-msg-content"><div class="fcw-bubble fcw-bubble-user"><p></p></div></div>';
+        wrapper.querySelector('p').textContent = text;
+      } else {
+        wrapper.innerHTML = '<div class="fcw-msg-content"><div class="fcw-bubble fcw-bubble-system"><p></p></div></div>';
+        wrapper.querySelector('p').textContent = text;
+      }
+      messages.appendChild(wrapper);
+      messages.scrollTop = messages.scrollHeight;
+      return wrapper;
+    }
+
+    function appendAgentChunk(text){
+      if(!agentBubble){
+        agentBubble = appendMsg('agent', '');
+      }
+      var p = agentBubble.querySelector('.fcw-bubble-agent p');
+      p.textContent += (p.textContent ? '\n' : '') + text;
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function setBusy(on){
+      busy = on;
+      input.disabled = on;
+      sendBtn.disabled = on;
+      input.placeholder = on ? 'kiro-cli is thinking…' : 'Message kiro-cli...';
+      if(!on) input.focus();
+    }
+
+    function connect(){
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(proto + '//' + location.host + '/ws');
+      ws.onopen = function(){
+        document.querySelector('.fcw-status-dot').classList.add('online');
+        setBusy(false);
+      };
+      ws.onmessage = function(ev){
+        var frame;
+        try{ frame = JSON.parse(ev.data); } catch(e){ frame = {type:'chunk', text: ev.data}; }
+        if(frame.type === 'system'){ appendMsg('system', frame.text); }
+        else if(frame.type === 'chunk'){ appendAgentChunk(frame.text); }
+        else if(frame.type === 'action'){ appendMsg('system', '✓ ' + frame.text); agentBubble = null; }
+        else if(frame.type === 'refresh'){ location.reload(); }
+        else if(frame.type === 'done'){ agentBubble = null; setBusy(false); }
+      };
+      ws.onclose = function(){
+        document.querySelector('.fcw-status-dot').classList.remove('online');
+        input.disabled = true;
+        input.placeholder = 'disconnected — click to retry';
+        busy = false;
+      };
+      ws.onerror = function(){ appendMsg('system', '[connection error]'); };
+    }
+
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var v = input.value.trim();
+      if(!v || busy || !ws || ws.readyState !== WebSocket.OPEN) return;
+      appendMsg('user', v);
+      ws.send(v);
+      input.value = '';
+      sendBtn.disabled = true;
+      setBusy(true);
+    });
+
+    input.addEventListener('input', function(){
+      sendBtn.disabled = !input.value.trim() || busy;
+    });
+
+    // Expose for /new page AI flow buttons
+    window.openChatWith = function(text){
+      if(!fcw.classList.contains('fcw-open')) toggleChat();
+      setTimeout(function(){
+        appendAgentChunk(text);
+        agentBubble = null;
+        if(!busy) input.focus();
+      }, 200);
+    };
+  })();
+  </script>
 </body>
 </html>{{end}}

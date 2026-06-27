@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/paulkinyatti/local-scava/internal/domain"
 )
@@ -89,4 +90,29 @@ func (s *Service) ListLogsBySprint(ctx context.Context, sprintID int64) ([]domai
 // ListEvents returns the recent career-event stream (the SRE "logs" view).
 func (s *Service) ListEvents(ctx context.Context, limit int) ([]domain.CareerEvent, error) {
 	return s.store.ListEvents(ctx, limit)
+}
+
+// WeekMaterial returns the daily logs for the calendar week containing the
+// given date, for a sprint. This is the raw material a Sunday recap is built
+// from (spec 05: the recap "pulls from the week's daily logs rather than
+// starting from scratch"). The window is Monday..Sunday of that week. A nil
+// sprintID falls back to the current active sprint.
+func (s *Service) WeekMaterial(ctx context.Context, sprintID *int64, anyDateInWeek string) ([]domain.DailyLog, error) {
+	if sprintID == nil {
+		if cur, err := s.store.GetCurrentSprint(ctx); err == nil {
+			sprintID = &cur.ID
+		}
+	}
+	ref := s.now().In(s.loc)
+	if anyDateInWeek != "" {
+		if t, err := time.ParseInLocation("2006-01-02", anyDateInWeek, s.loc); err == nil {
+			ref = t
+		}
+	}
+	// Monday as the start of the week.
+	offset := (int(ref.Weekday()) + 6) % 7 // Mon=0 ... Sun=6
+	monday := ref.AddDate(0, 0, -offset)
+	sunday := monday.AddDate(0, 0, 6)
+	return s.store.ListLogsByDateRange(ctx, sprintID,
+		monday.Format("2006-01-02"), sunday.Format("2006-01-02"))
 }

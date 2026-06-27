@@ -1,7 +1,56 @@
 {{define "content"}}
+<!-- AI-guided creation prompt -->
+<div class="card ai-welcome" id="ai-prompt">
+  <div class="ai-welcome-header">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/><path d="M8.24 4.33A4 4 0 0 1 12 2"/><circle cx="12" cy="12" r="2"/>
+      <path d="M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2 2 6.48 2 12s4.48 10 10 10z"/>
+      <path d="M17 17l-5-5"/><path d="M7 17l5-5"/>
+    </svg>
+    <span class="ai-welcome-title">What do you want to do today?</span>
+  </div>
+  <p class="ai-welcome-subtitle">Pick an action and I'll guide you through it — or describe what you need in the chat.</p>
+  <div class="ai-actions">
+    <button class="ai-action-btn" data-action="sprint" onclick="startAIFlow('sprint')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+      <span>Create new Sprint</span>
+    </button>
+    <button class="ai-action-btn" data-action="post" onclick="startAIFlow('post')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      <span>Create new Post</span>
+    </button>
+    <button class="ai-action-btn" data-action="log" onclick="startAIFlow('log')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+      <span>Log today's work</span>
+    </button>
+    <button class="ai-action-btn" data-action="adr" onclick="startAIFlow('adr')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      <span>Create new ADR</span>
+    </button>
+  </div>
+</div>
+
+<!-- Manual forms (hidden by default, shown when user picks an action or scrolls) -->
+<div class="section-divider" id="forms-section">
+  <span class="divider-label">Or fill in manually</span>
+</div>
+
 <div class="grid grid-2">
   <div class="card" id="log">
-    <div class="card-head">Log today</div>
+    <div class="card-head">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+      Log today
+    </div>
     <form method="post" action="/logs" class="stack">
       <input type="date" name="log_date" value="{{.Today}}">
       <input type="text" name="worked_on" placeholder="what I worked on (required)" required>
@@ -11,7 +60,7 @@
       <input type="text" name="blocker" placeholder="current blocker (optional)">
       <div class="radio-row">
         <span class="muted">blocker decision:</span>
-        <label><input type="radio" name="blocker_decision" value=""> none</label>
+        <label><input type="radio" name="blocker_decision" value="" checked> none</label>
         <label><input type="radio" name="blocker_decision" value="solve"> solve</label>
         <label><input type="radio" name="blocker_decision" value="workaround"> workaround</label>
         <label><input type="radio" name="blocker_decision" value="cut"> cut</label>
@@ -21,7 +70,12 @@
   </div>
 
   <div class="card" id="post">
-    <div class="card-head">New post</div>
+    <div class="card-head">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      New post
+    </div>
     <form method="post" action="/posts" class="stack">
       <div class="radio-row">
         <span class="muted">type:</span>
@@ -34,46 +88,64 @@
         <option value="0">— current sprint —</option>
         {{range .Sprints}}<option value="{{.ID}}">{{.MonthLabel}} · {{.SkillName}}</option>{{end}}
       </select>
-      <label><input type="checkbox" name="is_declaration" value="1"> this is the declaration post</label>
+      <label class="checkbox-label"><input type="checkbox" name="is_declaration" value="1"> this is the declaration post</label>
       <button class="btn" type="submit">create post</button>
     </form>
   </div>
 </div>
 
 <div class="card" id="sprint">
-  <div class="card-head">New sprint</div>
+  <div class="card-head">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+    </svg>
+    New sprint
+  </div>
   <form method="post" action="/sprints" class="stack">
-    <input type="text" name="month_label" placeholder="month label (e.g. {{.Today}} → 2026-07)">
-    <input type="text" name="skill_name" placeholder="skill of the month (required)" required>
+    <div class="grid grid-2">
+      <input type="text" name="month_label" placeholder="month label (e.g. 2026-07)">
+      <input type="text" name="skill_name" placeholder="skill of the month (required)" required>
+    </div>
     <input type="text" name="skill_rationale" placeholder="why this skill / what it unlocks">
     <input type="text" name="microapp_one_liner" placeholder="the microapp, in one sentence (required)" required>
     <input type="text" name="core_feature" placeholder="core feature that must work (required)" required>
     <input type="text" name="out_of_scope" placeholder="explicitly out of scope">
-    <select name="deploy_platform">
-      <option value="">— deploy platform —</option>
-      <option>Vercel</option><option>Netlify</option><option>Railway</option>
-      <option>Fly.io</option><option>Render</option><option>Other</option>
-    </select>
-    <div class="radio-row">
-      <span class="muted">status:</span>
-      <label><input type="radio" name="status" value="active" checked> active</label>
-      <label><input type="radio" name="status" value="planned"> planned</label>
+    <div class="grid grid-2">
+      <select name="deploy_platform">
+        <option value="">— deploy platform —</option>
+        <option>Vercel</option><option>Netlify</option><option>Railway</option>
+        <option>Fly.io</option><option>Render</option><option>Other</option>
+      </select>
+      <div class="radio-row">
+        <span class="muted">status:</span>
+        <label><input type="radio" name="status" value="active" checked> active</label>
+        <label><input type="radio" name="status" value="planned"> planned</label>
+      </div>
     </div>
     <button class="btn" type="submit">start sprint</button>
   </form>
 </div>
 
 <div class="card" id="adr">
-  <div class="card-head">New ADR</div>
+  <div class="card-head">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
+    New ADR
+  </div>
   <form method="post" action="/adrs" class="stack">
-    <input type="number" name="number" placeholder="number (blank = auto)">
-    <input type="text" name="title" placeholder="short title of the decision (required)" required>
-    <select name="status">
-      <option value="proposed">proposed</option>
-      <option value="decided">decided</option>
-      <option value="superseded">superseded</option>
-    </select>
-    <input type="date" name="decided_on">
+    <div class="grid grid-2">
+      <input type="number" name="number" placeholder="number (blank = auto)">
+      <input type="text" name="title" placeholder="short title of the decision (required)" required>
+    </div>
+    <div class="grid grid-2">
+      <select name="status">
+        <option value="proposed">proposed</option>
+        <option value="decided">decided</option>
+        <option value="superseded">superseded</option>
+      </select>
+      <input type="date" name="decided_on">
+    </div>
     <textarea name="problem" rows="2" placeholder="problem — what needed deciding"></textarea>
     <textarea name="options" rows="2" placeholder="options considered + tradeoffs"></textarea>
     <textarea name="decision" rows="2" placeholder="the decision"></textarea>
@@ -86,4 +158,23 @@
     <button class="btn" type="submit">create ADR</button>
   </form>
 </div>
+
+<script>
+// AI flow: opens the floating chat widget with a contextual prompt
+function startAIFlow(type) {
+  var prompts = {
+    sprint: "Tell me more about the sprint you want to create — what skill do you want to learn this month, and what will you build to prove it?",
+    post: "Tell me more about the post you want to create — is it a daily build update or a Sunday recap? What did you work on?",
+    log: "Tell me about today's work — what did you focus on, what happened, and any insights or blockers?",
+    adr: "Tell me about the architecture decision you want to record — what problem needed deciding and what options are you weighing?"
+  };
+  // Open the floating chat widget with the contextual prompt
+  if(window.openChatWith){
+    window.openChatWith(prompts[type] || "What would you like to create?");
+  }
+  // Scroll to the relevant form section too
+  var target = document.getElementById(type);
+  if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
+}
+</script>
 {{end}}

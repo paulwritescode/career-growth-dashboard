@@ -14,8 +14,8 @@ const logCols = `id, sprint_id, log_date, worked_on, what_happened, insight, nex
 func scanLog(row interface{ Scan(...any) error }) (domain.DailyLog, error) {
 	var l domain.DailyLog
 	var (
-		sprintID            sql.NullInt64
-		blockerDec          sql.NullString
+		sprintID             sql.NullInt64
+		blockerDec           sql.NullString
 		createdAt, updatedAt string
 	)
 	if err := row.Scan(&l.ID, &sprintID, &l.LogDate, &l.WorkedOn, &l.WhatHappened,
@@ -100,6 +100,27 @@ func (s *Store) ListLogs(ctx context.Context, limit int) ([]domain.DailyLog, err
 func (s *Store) ListLogsBySprint(ctx context.Context, sprintID int64) ([]domain.DailyLog, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+logCols+` FROM daily_logs WHERE sprint_id = ? ORDER BY log_date DESC, id DESC`, sprintID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return collectLogs(rows)
+}
+
+// ListLogsByDateRange returns logs for a sprint within [from, to] (inclusive
+// YYYY-MM-DD), oldest first. A nil sprintID matches orphan logs (sprint_id NULL).
+func (s *Store) ListLogsByDateRange(ctx context.Context, sprintID *int64, from, to string) ([]domain.DailyLog, error) {
+	var rows *sql.Rows
+	var err error
+	if sprintID == nil {
+		rows, err = s.db.QueryContext(ctx,
+			`SELECT `+logCols+` FROM daily_logs WHERE sprint_id IS NULL AND log_date BETWEEN ? AND ?
+			 ORDER BY log_date ASC, id ASC`, from, to)
+	} else {
+		rows, err = s.db.QueryContext(ctx,
+			`SELECT `+logCols+` FROM daily_logs WHERE sprint_id = ? AND log_date BETWEEN ? AND ?
+			 ORDER BY log_date ASC, id ASC`, *sprintID, from, to)
+	}
 	if err != nil {
 		return nil, err
 	}

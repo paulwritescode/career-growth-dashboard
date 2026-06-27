@@ -7,6 +7,19 @@
   </div>
 </div>
 
+{{if eq $p.PostType "recap"}}
+<div class="card">
+  <div class="card-head">Week material <span class="muted">— this week's build logs (Mon–Sun), raw material for the recap</span></div>
+  <div class="logstream">
+    {{range .WeekMaterial}}
+      <div class="logline"><span class="mono muted">{{.LogDate}}</span> {{.WorkedOn}}{{if .Insight}} — <span class="muted">{{.Insight}}</span>{{end}}</div>
+    {{else}}
+      <div class="muted">No daily logs recorded this week yet.</div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 {{range $p.Tiers}}
 <div class="card tier-card">
   <div class="card-head">{{.Tier.Label}} <span class="chip chip-{{.Status}}">{{.Status}}</span>

@@ -125,3 +125,30 @@ func (s *Store) ListEvents(ctx context.Context, limit int) ([]domain.CareerEvent
 	}
 	return out, rows.Err()
 }
+
+// ListEventsBySprint returns all career events for a sprint, oldest first. Used
+// to reconstruct the sprint's phase timeline for the trace view.
+func (s *Store) ListEventsBySprint(ctx context.Context, sprintID int64) ([]domain.CareerEvent, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, occurred_at, kind, source, sprint_id, post_id, summary, detail
+		 FROM career_events WHERE sprint_id = ? ORDER BY occurred_at ASC, id ASC`, sprintID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.CareerEvent
+	for rows.Next() {
+		var e domain.CareerEvent
+		var sprintID, postID sql.NullInt64
+		var occurredAt string
+		if err := rows.Scan(&e.ID, &occurredAt, &e.Kind, &e.Source, &sprintID,
+			&postID, &e.Summary, &e.Detail); err != nil {
+			return nil, err
+		}
+		e.OccurredAt = parseTime(occurredAt)
+		e.SprintID = intFromNull(sprintID)
+		e.PostID = intFromNull(postID)
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}

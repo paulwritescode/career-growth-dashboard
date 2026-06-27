@@ -56,6 +56,20 @@ func (s *Service) CreatePost(ctx context.Context, in CreatePostInput) (domain.Po
 	}
 	s.appendEvent(ctx, "post.created", in.Source, in.SprintID, &post.ID,
 		"Created "+string(post.PostType)+" post for "+post.PostDate, "")
+
+	// Declaration back-link (spec 04/05): a Phase-1 declaration post links back
+	// to its sprint via sprints.declaration_post_id so the sprint knows which
+	// post announced it.
+	if post.IsDeclaration && post.SprintID != nil {
+		if sp, err := s.store.GetSprint(ctx, *post.SprintID); err == nil {
+			sp.DeclarationPostID = &post.ID
+			if err := s.store.UpdateSprint(ctx, sp); err != nil {
+				return domain.Post{}, err
+			}
+			s.appendEvent(ctx, "sprint.declared", in.Source, post.SprintID, &post.ID,
+				sp.SkillName+": declaration post linked", "")
+		}
+	}
 	return post, nil
 }
 

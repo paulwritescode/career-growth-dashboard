@@ -33,6 +33,12 @@
   </form>
 </div>
 
+<div class="card">
+  <div class="card-head">Sprint trace <span class="muted">— phases as spans, width ∝ time spent</span></div>
+  <div class="chart-wrap trace-wrap">{{trace .Trace}}</div>
+  <div class="muted mono trace-legend">open span = current phase · fill intensity ∝ checklist completion</div>
+</div>
+
 <div class="grid grid-2">
   <div class="card">
     <div class="card-head">Phase checklist</div>

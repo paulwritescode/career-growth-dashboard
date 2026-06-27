@@ -1,25 +1,110 @@
 {{define "content"}}
-<div class="grid grid-4 stat-row">
-  <div class="card stat"><div class="stat-label">CADENCE · 7d</div><div class="stat-val mono">{{pct .Cadence7}}</div></div>
-  <div class="card stat"><div class="stat-label">CADENCE · 30d</div><div class="stat-val mono">{{pct .Cadence30}}</div></div>
-  <div class="card stat"><div class="stat-label">CADENCE · 90d</div><div class="stat-val mono">{{pct .Cadence90}}</div></div>
-  <div class="card stat"><div class="stat-label">SHIP RATE</div><div class="stat-val mono">{{pct .ShipRate.Rate}}</div><div class="muted">{{.ShipRate.Shipped}}/{{.ShipRate.Ended}}</div></div>
+<!-- Row 1: Headline stat panels (6-wide like Grafana's top row) -->
+<div class="grid grid-6 stat-row">
+  <div class="card stat"><div class="stat-label">CADENCE · 7d</div><div class="stat-val mono color-green">{{pct .Cadence7}}</div></div>
+  <div class="card stat"><div class="stat-label">CADENCE · 30d</div><div class="stat-val mono color-blue">{{pct .Cadence30}}</div></div>
+  <div class="card stat"><div class="stat-label">CADENCE · 90d</div><div class="stat-val mono color-purple">{{pct .Cadence90}}</div></div>
+  <div class="card stat"><div class="stat-label">SHIP RATE</div><div class="stat-val mono color-green">{{pct .ShipRate.Rate}}</div><div class="muted">{{.ShipRate.Shipped}}/{{.ShipRate.Ended}} ended</div></div>
+  <div class="card stat"><div class="stat-label">CURRENT STREAK</div><div class="stat-val mono color-orange">{{.Streaks.Current}}</div><div class="muted">days</div></div>
+  <div class="card stat"><div class="stat-label">LONGEST STREAK</div><div class="stat-val mono color-cyan">{{.Streaks.Longest}}</div><div class="muted">days</div></div>
 </div>
 
-<div class="card">
-  <div class="card-head">Published per day · 90d</div>
+<!-- Row 2: Uptime panels + aggregate stats -->
+<div class="grid grid-5 stat-row">
+  {{if .Uptime.Active}}
+  <div class="card stat">
+    <div class="stat-label">SPRINT UPTIME</div>
+    <div class="stat-val mono color-green">{{.Uptime.DaysActive}}<span class="stat-unit">d</span></div>
+    <div class="muted">{{.Uptime.SkillName}}</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">PHASE {{.Uptime.Phase}} TIME</div>
+    <div class="stat-val mono color-blue">{{.Uptime.DaysInPhase}}<span class="stat-unit">d</span></div>
+    <div class="muted">in current phase</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">LAST LOG</div>
+    <div class="stat-val mono {{if gt .Uptime.DaysSinceLog 2}}color-red{{else}}color-green{{end}}">{{.Uptime.DaysSinceLog}}<span class="stat-unit">d ago</span></div>
+  </div>
+  {{else}}
+  <div class="card stat"><div class="stat-label">SPRINT</div><div class="stat-val mono muted">—</div><div class="muted">no active sprint</div></div>
+  <div class="card stat"><div class="stat-label">PHASE</div><div class="stat-val mono muted">—</div></div>
+  <div class="card stat"><div class="stat-label">LAST LOG</div><div class="stat-val mono muted">—</div></div>
+  {{end}}
+  <div class="card stat"><div class="stat-label">POSTS THIS MONTH</div><div class="stat-val mono color-amber">{{.Stats.PostsThisMonth}}</div></div>
+  <div class="card stat"><div class="stat-label">LOGS THIS MONTH</div><div class="stat-val mono color-purple">{{.Stats.LogsThisMonth}}</div></div>
+</div>
+
+<!-- Row 3: Time-series area charts (Grafana-style line panels with fill) -->
+<div class="grid grid-2">
+  <div class="card panel">
+    <div class="card-head"><span class="panel-dot dot-green"></span>Posts per day · 30d</div>
+    <div class="chart-wrap">{{areaChart .PostCounts "var(--green)"}}</div>
+  </div>
+  <div class="card panel">
+    <div class="card-head"><span class="panel-dot dot-purple"></span>Build logs per day · 30d</div>
+    <div class="chart-wrap">{{areaChart .LogCounts "var(--purple)"}}</div>
+  </div>
+</div>
+
+<!-- Row 4: Full-width sparkline (like Grafana's wide time-series panel) -->
+<div class="card panel">
+  <div class="card-head"><span class="panel-dot dot-cyan"></span>Published tiers per day · 90d</div>
   <div class="chart-wrap">{{sparkline .Heatmap}}</div>
 </div>
 
-<div class="grid grid-2">
-  <div class="card">
-    <div class="card-head">Tier mix · published · 90d</div>
-    <div class="chart-wrap">{{tierBars .TierMix}}</div>
+<!-- Row 5: Gauges + donut + bar gauges (like Grafana's gauge row) -->
+<div class="grid grid-3">
+  <div class="card panel">
+    <div class="card-head"><span class="panel-dot dot-green"></span>Sprint progress</div>
+    <div class="ring-row">
+      {{if .Uptime.Active}}
+        {{progressRing .Uptime.PhasePct "Sprint" "var(--green)"}}
+      {{else}}
+        {{progressRing 0.0 "No sprint" "var(--line)"}}
+      {{end}}
+    </div>
   </div>
-  <div class="card">
-    <div class="card-head">Streaks</div>
-    <div class="stat-val mono">{{.Streaks.Current}}</div><div class="muted">current streak (days)</div>
-    <div class="stat-val mono">{{.Streaks.Longest}}</div><div class="muted">longest streak (days)</div>
+
+  <div class="card panel">
+    <div class="card-head"><span class="panel-dot dot-blue"></span>Tier mix · 90d</div>
+    <div class="chart-wrap donut-center">{{tierDonut .TierMix}}</div>
+  </div>
+
+  <div class="card panel">
+    <div class="card-head"><span class="panel-dot dot-orange"></span>Weekly tier goals</div>
+    <div class="gauge-stack">
+      {{range .TierGoals}}
+        <div class="gauge-row">
+          <span class="gauge-label mono">{{.Tier.Label}}</span>
+          {{if eq .Tier.Label "Blog"}}
+            {{barGauge .Tier.Label .Published .Target "var(--green)"}}
+          {{else if eq .Tier.Label "LinkedIn"}}
+            {{barGauge .Tier.Label .Published .Target "var(--blue)"}}
+          {{else}}
+            {{barGauge .Tier.Label .Published .Target "var(--yellow)"}}
+          {{end}}
+        </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<!-- Row 6: Totals row + activity feed (like Grafana's table + log panels) -->
+<div class="grid grid-2">
+  <div class="card panel">
+    <div class="card-head"><span class="panel-dot dot-amber"></span>Totals</div>
+    <div class="grid grid-4 inner-stats">
+      <div class="mini-stat"><div class="mini-val mono color-green">{{.Stats.TotalPosts}}</div><div class="muted">posts</div></div>
+      <div class="mini-stat"><div class="mini-val mono color-blue">{{.Stats.TotalLogs}}</div><div class="muted">build logs</div></div>
+      <div class="mini-stat"><div class="mini-val mono color-purple">{{.Stats.TotalADRs}}</div><div class="muted">ADRs</div></div>
+      <div class="mini-stat"><div class="mini-val mono color-orange">{{.Stats.TotalSprints}}</div><div class="muted">sprints</div></div>
+    </div>
+  </div>
+
+  <div class="card panel">
+    <div class="card-head"><span class="panel-dot dot-cyan"></span>Recent activity</div>
+    {{activityFeed .RecentActivity}}
   </div>
 </div>
 {{end}}

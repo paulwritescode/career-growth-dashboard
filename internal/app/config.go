@@ -13,12 +13,14 @@ import (
 // Config holds the daemon's runtime configuration. Resolution order is
 // command-line flag > environment variable > default.
 type Config struct {
-	Addr        string // bind address; loopback only in v1
-	DBPath      string // libSQL database file
-	KiroBin     string // kiro-cli binary for the chat bridge
-	LogLevel    string // debug|info|warn|error
-	LogFormat   string // text|json
-	MigrateOnly bool   // run migrations then exit
+	Addr         string // bind address; loopback only in v1
+	DBPath       string // libSQL database file
+	KiroBin      string // kiro-cli binary for the chat bridge
+	KiroTrustAll bool   // allow the chat agent to run tools without confirmation
+	LogLevel     string // debug|info|warn|error
+	LogFormat    string // text|json
+	MigrateOnly  bool   // run migrations then exit
+	Version      string // build version, for the settings/status display
 }
 
 // envOr returns the environment variable value or a fallback.
@@ -46,6 +48,7 @@ func Load(args []string) (Config, error) {
 	fs.StringVar(&cfg.Addr, "addr", envOr("SCAVA_ADDR", "127.0.0.1:5500"), "bind address (loopback only in v1)")
 	fs.StringVar(&cfg.DBPath, "db", envOr("SCAVA_DB", defaultDBPath()), "libSQL database file path")
 	fs.StringVar(&cfg.KiroBin, "kiro-bin", envOr("SCAVA_KIRO_BIN", "kiro-cli"), "kiro-cli binary for the chat bridge")
+	fs.BoolVar(&cfg.KiroTrustAll, "kiro-trust-all", envOr("SCAVA_KIRO_TRUST_ALL", "") == "1", "let the chat agent run tools without confirmation (riskier)")
 	fs.StringVar(&cfg.LogLevel, "log-level", envOr("SCAVA_LOG_LEVEL", "info"), "log level: debug|info|warn|error")
 	fs.StringVar(&cfg.LogFormat, "log-format", envOr("SCAVA_LOG_FORMAT", "text"), "log format: text|json")
 	fs.BoolVar(&cfg.MigrateOnly, "migrate-only", false, "run migrations then exit")

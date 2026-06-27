@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/paulkinyatti/local-scava/internal/bridge"
 	"github.com/paulkinyatti/local-scava/internal/service"
 	"github.com/paulkinyatti/local-scava/internal/store"
 	"github.com/paulkinyatti/local-scava/internal/web"
@@ -22,6 +25,7 @@ type App struct {
 	store  *store.Store
 	svc    *service.Service
 	web    *web.Handlers
+	bridge *bridge.Bridge
 	server *http.Server
 }
 
@@ -38,17 +42,42 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Security (spec 10): the DB file holds the user's career data and must be
+	// user-only readable/writable. Tighten perms after the driver creates it.
+	if err := os.Chmod(cfg.DBPath, 0o600); err != nil && !os.IsNotExist(err) {
+		log.Warn("could not set db file permissions", "db", cfg.DBPath, "err", err)
+	}
 	log.Info("migrations applied", "db", cfg.DBPath)
 
 	svc := service.New(st)
 
-	webHandlers, err := web.New(svc, log)
+	webHandlers, err := web.New(svc, log, web.Meta{
+		Addr:    cfg.Addr,
+		DBPath:  cfg.DBPath,
+		KiroBin: cfg.KiroBin,
+		Version: cfg.Version,
+	})
 	if err != nil {
 		_ = st.Close()
 		return nil, err
 	}
 
-	a := &App{cfg: cfg, log: log, store: st, svc: svc, web: webHandlers}
+	// Allowed Origin/Host values for the chat bridge: the configured bind addr
+	// plus its localhost alias.
+	allowedHosts := []string{cfg.Addr}
+	if h, p, ok := splitHostPort(cfg.Addr); ok {
+		if h == "127.0.0.1" {
+			allowedHosts = append(allowedHosts, "localhost:"+p)
+		} else if h == "localhost" {
+			allowedHosts = append(allowedHosts, "127.0.0.1:"+p)
+		}
+	}
+	if cfg.KiroTrustAll {
+		log.Warn("chat agent runs tools WITHOUT confirmation (--kiro-trust-all); the dashboard chat can mutate your system")
+	}
+	br := bridge.New(cfg.KiroBin, allowedHosts, cfg.KiroTrustAll, svc, log)
+
+	a := &App{cfg: cfg, log: log, store: st, svc: svc, web: webHandlers, bridge: br}
 	a.server = &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           a.routes(),
@@ -68,8 +97,39 @@ func (a *App) Logger() *slog.Logger { return a.log }
 func (a *App) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", a.handleHealthz)
+	mux.HandleFunc("GET /ws", a.bridge.HandleWS)
 	a.web.Mount(mux)
-	return mux
+	return a.validateHost(mux)
+}
+
+// validateHost rejects any request whose Host header is not a loopback host
+// (spec 10: anti DNS-rebinding). The bind is already loopback-only, but a
+// rebinding attack can still reach 127.0.0.1 with an attacker-controlled Host;
+// this is the defense for the dashboard routes the way the bridge guards /ws.
+func (a *App) validateHost(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !hostAllowed(r.Host) {
+			http.Error(w, "forbidden host", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// hostAllowed reports whether a Host header is a loopback host (with or without
+// a port). Anything else is rejected.
+func hostAllowed(host string) bool {
+	h := host
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		h = host[:i]
+	}
+	h = strings.Trim(h, "[]") // strip IPv6 brackets
+	switch h {
+	case "127.0.0.1", "localhost", "::1", "":
+		return true
+	default:
+		return strings.HasPrefix(h, "127.")
+	}
 }
 
 // handleHealthz reports daemon and database health. Loopback-only, no auth.
@@ -138,6 +198,15 @@ func newLogger(cfg Config) *slog.Logger {
 		h = slog.NewTextHandler(os.Stderr, opts)
 	}
 	return slog.New(h)
+}
+
+// splitHostPort splits "host:port"; ok is false if it cannot be parsed.
+func splitHostPort(addr string) (host, port string, ok bool) {
+	h, p, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", "", false
+	}
+	return h, p, true
 }
 
 // ensureDBDir creates the parent directory of the database file with

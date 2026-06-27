@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="card">
+  <div class="card-head">Daemon · read-only (v1)</div>
+  <table class="table kv-table">
+    <tbody>
+      <tr><td class="muted">version</td><td class="mono">{{.Meta.Version}}</td></tr>
+      <tr><td class="muted">bind address</td><td class="mono">{{.Meta.Addr}}</td></tr>
+      <tr><td class="muted">database</td><td class="mono">{{.Meta.DBPath}}</td></tr>
+      <tr><td class="muted">kiro-cli binary</td><td class="mono">{{.Meta.KiroBin}}</td></tr>
+      <tr><td class="muted">today (local)</td><td class="mono">{{.Today}}</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Configuration is set at startup via flags / env vars (see <span class="mono">--help</span>). Editing from the UI is out of scope for v1.</p>
+</div>
+
+<div class="card">
+  <div class="card-head">Security posture (spec 10)</div>
+  <ul class="settings-list">
+    <li>Bound to loopback only — non-loopback binds are rejected.</li>
+    <li>WebSocket <span class="mono">Origin</span> allow-listed; <span class="mono">Host</span> header validated on every route (anti DNS-rebinding).</li>
+    <li>All SQL parameterized; the chat bridge never receives raw SQL or a shell.</li>
+    <li>Database file created with <span class="mono">0600</span> permissions in a <span class="mono">0700</span> directory.</li>
+    <li>No authentication beyond loopback — a deliberate, documented v1 tradeoff.</li>
+  </ul>
+</div>
+{{end}}

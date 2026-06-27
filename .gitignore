@@ -37,6 +37,7 @@ go.work.sum
 # local-scava build output (the compiled daemon binary)
 /local-scava
 local-scava-bin
+/bin/
 
 # libSQL database files (local data, never committed)
 *.db

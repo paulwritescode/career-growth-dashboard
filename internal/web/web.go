@@ -27,17 +27,26 @@ var templatesFS embed.FS
 //go:embed static
 var staticFS embed.FS
 
+// Meta holds read-only daemon facts surfaced on the Settings page and footer.
+type Meta struct {
+	Addr    string
+	DBPath  string
+	KiroBin string
+	Version string
+}
+
 // Handlers holds the dependencies shared by all HTTP handlers.
 type Handlers struct {
 	svc       *service.Service
 	log       *slog.Logger
+	meta      Meta
 	templates map[string]*template.Template // page name -> parsed template set
 	static    http.Handler
 }
 
 // New builds the web handlers, parsing all page templates against the shared
 // layout and partials.
-func New(svc *service.Service, log *slog.Logger) (*Handlers, error) {
+func New(svc *service.Service, log *slog.Logger, meta Meta) (*Handlers, error) {
 	tmpls, err := buildTemplates()
 	if err != nil {
 		return nil, err
@@ -49,6 +58,7 @@ func New(svc *service.Service, log *slog.Logger) (*Handlers, error) {
 	return &Handlers{
 		svc:       svc,
 		log:       log,
+		meta:      meta,
 		templates: tmpls,
 		static:    http.StripPrefix("/static/", http.FileServer(http.FS(sub))),
 	}, nil
@@ -67,6 +77,7 @@ func (h *Handlers) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /adrs", h.handleADRList)
 	mux.HandleFunc("GET /metrics", h.handleMetrics)
 	mux.HandleFunc("GET /new", h.handleNew)
+	mux.HandleFunc("GET /settings", h.handleSettings)
 
 	// Mutating form routes (task 8 wires the bodies; declared here so the nav works).
 	mux.HandleFunc("POST /sprints", h.handleSprintCreate)
@@ -89,7 +100,7 @@ func funcMap() template.FuncMap {
 			}
 			return *p
 		},
-		"pct": func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
+		"pct":    func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
 		"phases": domain.AllPhases,
 		"tiers":  domain.AllTiers,
 		"shortDate": func(s string) string {
@@ -98,12 +109,20 @@ func funcMap() template.FuncMap {
 			}
 			return s
 		},
-		"timeShort": func(t time.Time) string { return t.Local().Format("2006-01-02 15:04") },
-		"add":       func(a, b int) int { return a + b },
-		"title":     func(s string) string { return s },
+		"timeShort":  func(t time.Time) string { return t.Local().Format("2006-01-02 15:04") },
+		"add":        func(a, b int) int { return a + b },
+		"title":      func(s string) string { return s },
 		"phaseLabel": func(p domain.Phase) string { return p.Label() },
 		"sparkline":  sparklineSVG,
 		"tierBars":   tierBarsSVG,
+		"tierDonut":  tierMixDonutSVG,
+		"trace":      sprintTraceSVG,
+		// Grafana-style additions.
+		"barGauge":     barGaugeSVG,
+		"areaChart":    areaChartSVG,
+		"uptime":       uptimeSVG,
+		"progressRing": progressRingSVG,
+		"activityFeed": activityFeedHTML,
 	}
 }
 

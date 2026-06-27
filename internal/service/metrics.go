@@ -256,3 +256,221 @@ func (s *Service) CadenceHeatmap(ctx context.Context, windowDays int) ([]Cadence
 	}
 	return cells, nil
 }
+
+// --- Extended metrics for Grafana-style dashboard -------------------------
+
+// WeeklyPostCounts returns per-day post counts for the trailing window (for
+// area chart). Each entry is (date, total posts created that day).
+type DayCount struct {
+	Date  string
+	Count int
+}
+
+// DailyPostCounts returns the number of posts created per day in the window.
+func (s *Service) DailyPostCounts(ctx context.Context, windowDays int) ([]DayCount, error) {
+	if windowDays <= 0 {
+		windowDays = 30
+	}
+	end := s.now().In(s.loc)
+	start := end.AddDate(0, 0, -(windowDays - 1))
+	posts, err := s.store.ListPosts(ctx, 500)
+	if err != nil {
+		return nil, err
+	}
+	byDate := map[string]int{}
+	for _, p := range posts {
+		byDate[p.PostDate]++
+	}
+	var out []DayCount
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+		ds := d.Format("2006-01-02")
+		out = append(out, DayCount{Date: ds, Count: byDate[ds]})
+	}
+	return out, nil
+}
+
+// DailyLogCounts returns the number of build logs recorded per day in the window.
+func (s *Service) DailyLogCounts(ctx context.Context, windowDays int) ([]DayCount, error) {
+	if windowDays <= 0 {
+		windowDays = 30
+	}
+	end := s.now().In(s.loc)
+	start := end.AddDate(0, 0, -(windowDays - 1))
+	logs, err := s.store.ListLogs(ctx, 500)
+	if err != nil {
+		return nil, err
+	}
+	byDate := map[string]int{}
+	for _, l := range logs {
+		byDate[l.LogDate]++
+	}
+	var out []DayCount
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+		ds := d.Format("2006-01-02")
+		out = append(out, DayCount{Date: ds, Count: byDate[ds]})
+	}
+	return out, nil
+}
+
+// TierGoalProgress returns how many tiers have been published this week vs a
+// target. Target assumes 5 cadence days * 2 credibility tiers = 10 max.
+type TierGoalProgress struct {
+	Tier      domain.Tier
+	Published int
+	Target    int
+}
+
+// WeeklyTierGoals returns per-tier progress toward a weekly target (target:
+// 5 posts/week for credibility tiers, 3 for X tier).
+func (s *Service) WeeklyTierGoals(ctx context.Context) ([]TierGoalProgress, error) {
+	end := s.now().In(s.loc)
+	// Go back to Monday of the current week.
+	offset := (int(end.Weekday()) + 6) % 7
+	monday := end.AddDate(0, 0, -offset)
+	from := monday.Format("2006-01-02")
+	to := end.Format("2006-01-02")
+	mix, err := s.store.PublishedTierCounts(ctx, from, to)
+	if err != nil {
+		return nil, err
+	}
+	targets := map[domain.Tier]int{
+		domain.TierBlog:     5,
+		domain.TierLinkedIn: 5,
+		domain.TierX:        3,
+	}
+	var out []TierGoalProgress
+	for _, t := range domain.AllTiers() {
+		out = append(out, TierGoalProgress{
+			Tier:      t,
+			Published: mix[t],
+			Target:    targets[t],
+		})
+	}
+	return out, nil
+}
+
+// SprintUptime returns how long the current sprint has been active.
+type SprintUptime struct {
+	Active       bool
+	SkillName    string
+	Phase        domain.Phase
+	DaysActive   int
+	DaysInPhase  int
+	TotalDays    int // total planned sprint days (30)
+	PhasePct     float64
+	DaysSinceLog int // days since last build log
+}
+
+// CurrentSprintUptime computes the "uptime" view for the active sprint.
+func (s *Service) CurrentSprintUptime(ctx context.Context) (SprintUptime, error) {
+	sp, err := s.store.GetCurrentSprint(ctx)
+	if err != nil {
+		return SprintUptime{}, err
+	}
+	now := s.now().In(s.loc)
+	var daysActive int
+	if sp.StartedOn != nil {
+		if start, perr := time.ParseInLocation("2006-01-02", *sp.StartedOn, s.loc); perr == nil {
+			daysActive = int(now.Sub(start).Hours()/24) + 1
+		}
+	}
+
+	// Days in current phase: look at phase_changed events.
+	events, err := s.store.ListEventsBySprint(ctx, sp.ID)
+	if err != nil {
+		return SprintUptime{}, err
+	}
+	phaseStart := sp.CreatedAt
+	for _, e := range events {
+		if e.Kind == "sprint.phase_changed" {
+			phaseStart = e.OccurredAt
+		}
+	}
+	daysInPhase := int(now.Sub(phaseStart).Hours()/24) + 1
+
+	// Days since last log.
+	logs, err := s.store.ListLogsBySprint(ctx, sp.ID)
+	if err != nil {
+		return SprintUptime{}, err
+	}
+	daysSinceLog := daysActive
+	if len(logs) > 0 {
+		lastDate := logs[0].LogDate // newest first
+		if t, perr := time.ParseInLocation("2006-01-02", lastDate, s.loc); perr == nil {
+			daysSinceLog = int(now.Sub(t).Hours() / 24)
+		}
+	}
+
+	return SprintUptime{
+		Active:       true,
+		SkillName:    sp.SkillName,
+		Phase:        sp.CurrentPhase,
+		DaysActive:   daysActive,
+		DaysInPhase:  daysInPhase,
+		TotalDays:    30,
+		PhasePct:     float64(daysActive) / 30.0,
+		DaysSinceLog: daysSinceLog,
+	}, nil
+}
+
+// ContentStats holds aggregate content counts.
+type ContentStats struct {
+	TotalPosts     int
+	TotalLogs      int
+	TotalADRs      int
+	TotalSprints   int
+	PostsThisMonth int
+	LogsThisMonth  int
+}
+
+// ContentStats returns aggregate counts for headline stat panels.
+func (s *Service) ContentStats(ctx context.Context) (ContentStats, error) {
+	posts, err := s.store.ListPosts(ctx, 9999)
+	if err != nil {
+		return ContentStats{}, err
+	}
+	logs, err := s.store.ListLogs(ctx, 9999)
+	if err != nil {
+		return ContentStats{}, err
+	}
+	adrs, err := s.store.ListADRs(ctx)
+	if err != nil {
+		return ContentStats{}, err
+	}
+	sprints, err := s.store.ListSprints(ctx)
+	if err != nil {
+		return ContentStats{}, err
+	}
+
+	now := s.now().In(s.loc)
+	monthPrefix := now.Format("2006-01")
+	postsThisMonth := 0
+	for _, p := range posts {
+		if len(p.PostDate) >= 7 && p.PostDate[:7] == monthPrefix {
+			postsThisMonth++
+		}
+	}
+	logsThisMonth := 0
+	for _, l := range logs {
+		if len(l.LogDate) >= 7 && l.LogDate[:7] == monthPrefix {
+			logsThisMonth++
+		}
+	}
+
+	return ContentStats{
+		TotalPosts:     len(posts),
+		TotalLogs:      len(logs),
+		TotalADRs:      len(adrs),
+		TotalSprints:   len(sprints),
+		PostsThisMonth: postsThisMonth,
+		LogsThisMonth:  logsThisMonth,
+	}, nil
+}
+
+// RecentActivity returns the last N career events for a live activity feed.
+func (s *Service) RecentActivity(ctx context.Context, limit int) ([]domain.CareerEvent, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	return s.store.ListEvents(ctx, limit)
+}

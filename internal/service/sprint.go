@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/paulkinyatti/local-scava/internal/domain"
 )
@@ -112,7 +113,8 @@ func (s *Service) SetPhase(ctx context.Context, id int64, phase domain.Phase, sr
 		return domain.Sprint{}, err
 	}
 	s.appendEvent(ctx, "sprint.phase_changed", src, &sp.ID, nil,
-		sp.SkillName+": phase "+old.Label()+" → "+phase.Label(), "")
+		sp.SkillName+": phase "+old.Label()+" → "+phase.Label(),
+		fmt.Sprintf(`{"from":%d,"to":%d}`, old, phase))
 	return s.store.GetSprint(ctx, id)
 }
 

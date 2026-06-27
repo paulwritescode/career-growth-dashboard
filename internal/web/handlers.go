@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -11,14 +12,23 @@ import (
 
 // pageBase carries fields common to every page (for the layout/sidebar).
 type pageBase struct {
-	Title  string
-	Nav    string // active sidebar key
-	Today  string
-	Flash  string
+	Title       string
+	Nav         string // active sidebar key
+	Today       string
+	Flash       string
+	HasActive   bool   // an active sprint exists (for the top status bar)
+	ActiveSkill string // active sprint's skill name
+	ActivePhase int    // active sprint's current phase number
 }
 
 func (h *Handlers) base(title, nav string) pageBase {
-	return pageBase{Title: title, Nav: nav, Today: h.svc.Today()}
+	pb := pageBase{Title: title, Nav: nav, Today: h.svc.Today()}
+	if sp, err := h.svc.CurrentSprint(context.Background()); err == nil {
+		pb.HasActive = true
+		pb.ActiveSkill = sp.SkillName
+		pb.ActivePhase = int(sp.CurrentPhase)
+	}
+	return pb
 }
 
 func parseID(r *http.Request) (int64, error) {
@@ -86,6 +96,7 @@ type sprintDetailData struct {
 	Logs      []domain.DailyLog
 	Health    service.PhaseHealth
 	Unchecked int
+	Trace     []service.PhaseSpan
 }
 
 func (h *Handlers) handleSprintDetail(w http.ResponseWriter, r *http.Request) {
@@ -128,9 +139,14 @@ func (h *Handlers) handleSprintDetail(w http.ResponseWriter, r *http.Request) {
 	case unchecked == 2:
 		health = service.HealthAmber
 	}
+	trace, err := h.svc.SprintTrace(ctx, id)
+	if err != nil {
+		h.serverError(w, err)
+		return
+	}
 	h.render(w, "sprint_detail", sprintDetailData{
 		pageBase: h.base("Sprint · "+sp.SkillName, "sprints"),
-		Sprint:   sp, Checklist: byPhase, Logs: logs, Health: health, Unchecked: unchecked,
+		Sprint:   sp, Checklist: byPhase, Logs: logs, Health: health, Unchecked: unchecked, Trace: trace,
 	})
 }
 
@@ -168,8 +184,9 @@ func (h *Handlers) handleCadence(w http.ResponseWriter, r *http.Request) {
 
 type postDetailData struct {
 	pageBase
-	Post domain.Post
-	ADRs []domain.ADR
+	Post         domain.Post
+	ADRs         []domain.ADR
+	WeekMaterial []domain.DailyLog // for recap posts: the week's daily logs
 }
 
 func (h *Handlers) handlePostDetail(w http.ResponseWriter, r *http.Request) {
@@ -192,9 +209,20 @@ func (h *Handlers) handlePostDetail(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, err)
 		return
 	}
-	h.render(w, "post_detail", postDetailData{
+	data := postDetailData{
 		pageBase: h.base("Post · "+post.PostDate, "cadence"), Post: post, ADRs: adrs,
-	})
+	}
+	// Sunday recaps draw from the week's daily logs (spec 05): surface them as
+	// raw material for drafting.
+	if post.PostType == domain.PostRecap {
+		mat, err := h.svc.WeekMaterial(ctx, post.SprintID, post.PostDate)
+		if err != nil {
+			h.serverError(w, err)
+			return
+		}
+		data.WeekMaterial = mat
+	}
+	h.render(w, "post_detail", data)
 }
 
 // --- Logbook --------------------------------------------------------------
@@ -240,13 +268,19 @@ func (h *Handlers) handleADRList(w http.ResponseWriter, r *http.Request) {
 
 type metricsData struct {
 	pageBase
-	Heatmap  []service.CadenceCell
-	Cadence7 float64
-	Cadence30 float64
-	Cadence90 float64
-	Streaks  service.Streaks
-	ShipRate service.ShipRateResult
-	TierMix  map[domain.Tier]int
+	Heatmap        []service.CadenceCell
+	Cadence7       float64
+	Cadence30      float64
+	Cadence90      float64
+	Streaks        service.Streaks
+	ShipRate       service.ShipRateResult
+	TierMix        map[domain.Tier]int
+	TierGoals      []service.TierGoalProgress
+	PostCounts     []service.DayCount
+	LogCounts      []service.DayCount
+	Uptime         service.SprintUptime
+	Stats          service.ContentStats
+	RecentActivity []domain.CareerEvent
 }
 
 func (h *Handlers) handleMetrics(w http.ResponseWriter, r *http.Request) {
@@ -274,10 +308,28 @@ func (h *Handlers) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, err)
 		return
 	}
+	tierGoals, _ := h.svc.WeeklyTierGoals(ctx)
+	postCounts, _ := h.svc.DailyPostCounts(ctx, 30)
+	logCounts, _ := h.svc.DailyLogCounts(ctx, 30)
+	uptime, _ := h.svc.CurrentSprintUptime(ctx)
+	stats, _ := h.svc.ContentStats(ctx)
+	activity, _ := h.svc.RecentActivity(ctx, 8)
+
 	h.render(w, "metrics", metricsData{
-		pageBase: h.base("Metrics", "metrics"),
-		Heatmap:  cells, Cadence7: c7, Cadence30: c30, Cadence90: c90,
-		Streaks: streaks, ShipRate: shipRate, TierMix: mix,
+		pageBase:       h.base("Metrics", "metrics"),
+		Heatmap:        cells,
+		Cadence7:       c7,
+		Cadence30:      c30,
+		Cadence90:      c90,
+		Streaks:        streaks,
+		ShipRate:       shipRate,
+		TierMix:        mix,
+		TierGoals:      tierGoals,
+		PostCounts:     postCounts,
+		LogCounts:      logCounts,
+		Uptime:         uptime,
+		Stats:          stats,
+		RecentActivity: activity,
 	})
 }
 
@@ -302,4 +354,15 @@ func (h *Handlers) handleNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.render(w, "new", newData{pageBase: h.base("New entry", "new"), Sprints: sprints, ADRs: adrs})
+}
+
+// --- Settings (read-only config view) -------------------------------------
+
+type settingsData struct {
+	pageBase
+	Meta Meta
+}
+
+func (h *Handlers) handleSettings(w http.ResponseWriter, r *http.Request) {
+	h.render(w, "settings", settingsData{pageBase: h.base("Settings", "settings"), Meta: h.meta})
 }

@@ -28,6 +28,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
+	cfg.Version = version
 
 	// Root context cancelled on SIGINT/SIGTERM; everything derives from it so a
 	// single signal cascades a graceful shutdown.
