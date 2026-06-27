@@ -326,22 +326,86 @@ textarea{font-family:var(--mono); width:100%; height:auto; min-height:100px}
 .settings-list{margin:0; padding-left:18px; color:var(--fg-1)}
 .settings-list li{margin:4px 0}
 
-/* command palette (⌘K) — ElevenLabs rounded-xxl */
-.palette{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; z-index:80;
-  align-items:flex-start; justify-content:center}
-.palette.show{display:flex}
-.palette-box{margin-top:12vh; width:520px; max-width:92vw; background:var(--bg-1);
-  border:1px solid var(--line); box-shadow:var(--shadow-hover); border-radius:var(--r-xxl); overflow:hidden}
-.palette-box input{width:100%; border:none; border-bottom:1px solid var(--line); background:var(--bg-1);
-  padding:var(--sp-sm) var(--sp-base); font-size:15px; color:var(--fg-0); height:52px; border-radius:0}
-.palette-box input:focus{outline:none}
-.palette-list{list-style:none; margin:0; padding:var(--sp-xxs); max-height:50vh; overflow:auto}
-.palette-item{display:flex; justify-content:space-between; align-items:center; padding:var(--sp-xs) var(--sp-sm);
-  cursor:pointer; color:var(--fg-1); border-radius:var(--r-md)}
-.palette-item.sel{background:var(--bg-2); color:var(--fg-0); border-left:2px solid var(--fg-0)}
-.palette-item:hover{background:var(--bg-2)}
-.palette-hint{color:var(--fg-2); font-size:11px; text-transform:uppercase; letter-spacing:.06em}
-.palette-foot{padding:var(--sp-xs) var(--sp-sm); border-top:1px solid var(--line); font-size:11px}
+/* command palette (⌘K) — shadcn-inspired glassmorphism palette */
+.palette-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px); display:none; z-index:80; align-items:center; justify-content:center}
+.palette-overlay.show{display:flex; animation:palette-fade-in .15s ease}
+@keyframes palette-fade-in{from{opacity:0} to{opacity:1}}
+
+.palette-panel{width:640px; max-width:92vw; max-height:80vh; background:rgba(24,24,24,0.85);
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--line);
+  border-radius:var(--r-xl); box-shadow:0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05) inset;
+  display:flex; flex-direction:column; overflow:hidden;
+  animation:palette-slide-in .2s cubic-bezier(0.16,1,0.3,1)}
+@keyframes palette-slide-in{from{opacity:0; transform:scale(0.96) translateY(-12px)} to{opacity:1; transform:scale(1) translateY(0)}}
+
+/* Search */
+.palette-search{display:flex; align-items:center; padding:0 16px; border-bottom:1px solid var(--line); height:52px}
+.palette-search-icon{flex-shrink:0; color:var(--fg-2); margin-right:12px}
+.palette-search input{flex:1; background:none; border:none; color:var(--fg-0); font-size:15px;
+  padding:0; height:100%; outline:none; font-family:var(--sans)}
+.palette-search input::placeholder{color:var(--fg-2)}
+.palette-search-hints{display:flex; align-items:center; gap:6px; flex-shrink:0}
+
+/* Category pills */
+.palette-categories{display:flex; align-items:center; gap:6px; padding:8px 16px;
+  border-bottom:1px solid var(--line); overflow-x:auto}
+.palette-categories::-webkit-scrollbar{display:none}
+.palette-cat{background:rgba(255,255,255,0.06); border:none; color:var(--fg-2); font-size:12px;
+  font-weight:500; padding:4px 12px; border-radius:var(--r-pill); cursor:pointer;
+  transition:all .15s; font-family:var(--sans); white-space:nowrap}
+.palette-cat:hover{background:rgba(255,255,255,0.1); color:var(--fg-1)}
+.palette-cat.active{background:var(--blue); color:#fff; box-shadow:0 2px 8px rgba(87,148,242,0.3)}
+
+/* Command list */
+.palette-list-wrap{flex:1; overflow-y:auto; padding:8px 0; max-height:400px}
+.palette-list-wrap::-webkit-scrollbar{width:6px}
+.palette-list-wrap::-webkit-scrollbar-track{background:transparent}
+.palette-list-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1); border-radius:3px}
+.palette-list-wrap:hover::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.2)}
+.palette-list{list-style:none; margin:0; padding:0}
+
+/* Group headers */
+.palette-group{padding:8px 16px 4px; font-size:11px; font-weight:500; color:var(--fg-2);
+  text-transform:uppercase; letter-spacing:.06em; display:flex; align-items:center; gap:8px}
+.palette-group-count{font-weight:400; opacity:.6}
+
+/* Command items */
+.palette-item{display:flex; align-items:center; justify-content:space-between; padding:8px 16px;
+  margin:0 8px; border-radius:var(--r-md); cursor:pointer; transition:background .1s, color .1s}
+.palette-item:hover{background:rgba(255,255,255,0.06)}
+.palette-item.sel{background:rgba(255,255,255,0.1); color:var(--fg-0)}
+.palette-item-left{display:flex; align-items:center; gap:10px; min-width:0}
+.palette-item-icon{width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+  border-radius:var(--r-sm); border:1px solid var(--line); background:rgba(255,255,255,0.04); flex-shrink:0}
+.palette-item.sel .palette-item-icon{border-color:rgba(255,255,255,0.2); background:rgba(255,255,255,0.08)}
+.palette-item-text{display:flex; flex-direction:column; min-width:0}
+.palette-item-title{font-size:13px; font-weight:500; color:var(--fg-0); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis}
+.palette-item-desc{font-size:11px; color:var(--fg-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.palette-item-right{display:flex; align-items:center; gap:8px; flex-shrink:0}
+.palette-item-cat{font-size:11px; color:var(--fg-2)}
+.palette-kbd{display:inline-flex; align-items:center; justify-content:center; min-width:20px;
+  height:20px; padding:0 5px; font-size:11px; font-family:var(--mono); font-weight:500;
+  color:var(--fg-2); background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+  border-radius:4px; line-height:1}
+
+/* Empty state */
+.palette-empty{display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:32px 16px; color:var(--fg-2)}
+.palette-empty svg{margin-bottom:8px; opacity:.4}
+.palette-empty p{font-size:13px; margin:0 0 8px}
+.palette-empty button{background:rgba(255,255,255,0.08); border:1px solid var(--line);
+  color:var(--fg-1); padding:4px 12px; border-radius:var(--r-md); font-size:12px; cursor:pointer}
+.palette-empty button:hover{background:rgba(255,255,255,0.12)}
+
+/* Footer */
+.palette-footer{display:flex; align-items:center; justify-content:space-between;
+  padding:8px 16px; border-top:1px solid var(--line); min-height:40px}
+.palette-footer-left,.palette-footer-right{display:flex; align-items:center; gap:6px}
+.palette-footer-left svg{color:var(--fg-2)}
+.palette-footer span{font-size:11px; font-weight:500; color:var(--fg-2)}
+.palette-footer-sep{color:rgba(255,255,255,0.15); margin:0 4px}
 
 /* --- Grafana-style dashboard additions ----------------------------------- */
 

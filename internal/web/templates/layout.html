@@ -116,11 +116,50 @@
     </div>
   </main>
 
-  <div class="palette" id="palette" aria-hidden="true">
-    <div class="palette-box" role="dialog" aria-label="quick create">
-      <input type="text" id="palette-input" placeholder="jump to or create… (type to filter)" autocomplete="off">
-      <ul class="palette-list" id="palette-list"></ul>
-      <div class="palette-foot muted mono">↑↓ to move · ↵ to open · esc to close</div>
+  <div class="palette-overlay" id="palette" aria-hidden="true">
+    <div class="palette-panel" id="palette-panel">
+      <!-- Search input -->
+      <div class="palette-search">
+        <svg class="palette-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="palette-input" placeholder="Search commands or type to filter..." autocomplete="off">
+        <div class="palette-search-hints">
+          <kbd class="palette-kbd">Esc</kbd>
+        </div>
+      </div>
+
+      <!-- Category filter pills -->
+      <div class="palette-categories" id="palette-categories">
+        <button class="palette-cat active" data-cat="all">All</button>
+        <button class="palette-cat" data-cat="navigate">Navigate</button>
+        <button class="palette-cat" data-cat="create">Create</button>
+        <button class="palette-cat" data-cat="action">Actions</button>
+      </div>
+
+      <!-- Command list -->
+      <div class="palette-list-wrap">
+        <ul class="palette-list" id="palette-list"></ul>
+      </div>
+
+      <!-- Footer with keyboard hints -->
+      <div class="palette-footer">
+        <div class="palette-footer-left">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/>
+          </svg>
+          <span>+</span>
+          <kbd class="palette-kbd">K</kbd>
+        </div>
+        <div class="palette-footer-right">
+          <span>Navigate</span>
+          <kbd class="palette-kbd">↑</kbd>
+          <kbd class="palette-kbd">↓</kbd>
+          <span class="palette-footer-sep">|</span>
+          <span>Open</span>
+          <kbd class="palette-kbd">↵</kbd>
+        </div>
+      </div>
     </div>
   </div>
 
