@@ -288,6 +288,20 @@
       } else if(type === 'user'){
         wrapper.innerHTML = '<div class="fcw-msg-content"><div class="fcw-bubble fcw-bubble-user"><p></p></div></div>';
         wrapper.querySelector('p').textContent = text;
+      } else if(type === 'action'){
+        // Agent plan task-item style (inspired by agent-plan component)
+        wrapper.className = 'fcw-msg fcw-msg-action';
+        wrapper.innerHTML = '<div class="fcw-task-item fcw-task-completed">'
+          + '<svg class="fcw-task-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+          + '<span class="fcw-task-text"></span></div>';
+        wrapper.querySelector('.fcw-task-text').textContent = text;
+      } else if(type === 'thinking'){
+        // In-progress task item (spinning indicator)
+        wrapper.className = 'fcw-msg fcw-msg-action';
+        wrapper.innerHTML = '<div class="fcw-task-item fcw-task-progress">'
+          + '<svg class="fcw-task-icon fcw-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12"/></svg>'
+          + '<span class="fcw-task-text"></span></div>';
+        wrapper.querySelector('.fcw-task-text').textContent = text;
       } else {
         wrapper.innerHTML = '<div class="fcw-msg-content"><div class="fcw-bubble fcw-bubble-system"><p></p></div></div>';
         wrapper.querySelector('p').textContent = text;
@@ -311,7 +325,15 @@
       input.disabled = on;
       sendBtn.disabled = on;
       input.placeholder = on ? 'kiro-cli is thinking…' : 'Message kiro-cli...';
-      if(!on) input.focus();
+      if(on){
+        // Show thinking indicator as a task item
+        appendMsg('thinking', 'Processing your request…');
+      } else {
+        // Remove thinking indicator
+        var thinking = messages.querySelector('.fcw-task-progress');
+        if(thinking) thinking.parentElement.remove();
+        input.focus();
+      }
     }
 
     function connect(){
@@ -326,7 +348,13 @@
         try{ frame = JSON.parse(ev.data); } catch(e){ frame = {type:'chunk', text: ev.data}; }
         if(frame.type === 'system'){ appendMsg('system', frame.text); }
         else if(frame.type === 'chunk'){ appendAgentChunk(frame.text); }
-        else if(frame.type === 'action'){ appendMsg('system', '✓ ' + frame.text); agentBubble = null; }
+        else if(frame.type === 'action'){
+          // Remove any thinking indicator and show completed task
+          var thinking = messages.querySelector('.fcw-task-progress');
+          if(thinking) thinking.parentElement.remove();
+          appendMsg('action', frame.text);
+          agentBubble = null;
+        }
         else if(frame.type === 'refresh'){ location.reload(); }
         else if(frame.type === 'done'){ agentBubble = null; setBusy(false); }
       };
