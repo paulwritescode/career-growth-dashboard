@@ -197,3 +197,16 @@ func (s *Service) Checklist(ctx context.Context, sprintID int64) ([]domain.Check
 func (s *Service) ToggleChecklistItem(ctx context.Context, id int64, done bool) error {
 	return s.store.ToggleChecklistItem(ctx, id, done)
 }
+
+// DeleteSprint removes a sprint and its checklist. Records a career event.
+func (s *Service) DeleteSprint(ctx context.Context, id int64, src domain.EventSource) error {
+	sp, err := s.store.GetSprint(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.store.DeleteSprint(ctx, id); err != nil {
+		return err
+	}
+	s.appendEvent(ctx, "sprint.deleted", src, &id, nil, "Deleted sprint: "+sp.SkillName, "")
+	return nil
+}

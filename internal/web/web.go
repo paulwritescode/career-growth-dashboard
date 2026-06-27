@@ -84,11 +84,16 @@ func (h *Handlers) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("POST /sprints/{id}/phase", h.handleSprintPhase)
 	mux.HandleFunc("POST /sprints/{id}/status", h.handleSprintStatus)
 	mux.HandleFunc("POST /sprints/{id}/retro", h.handleSprintRetro)
+	mux.HandleFunc("POST /sprints/{id}/delete", h.handleSprintDelete)
 	mux.HandleFunc("POST /checklist/{id}/toggle", h.handleChecklistToggle)
 	mux.HandleFunc("POST /logs", h.handleLogCreate)
+	mux.HandleFunc("POST /logs/{id}/delete", h.handleLogDelete)
 	mux.HandleFunc("POST /posts", h.handlePostCreate)
 	mux.HandleFunc("POST /posts/{id}/tier", h.handleTierUpdate)
+	mux.HandleFunc("POST /posts/{id}/delete", h.handlePostDelete)
 	mux.HandleFunc("POST /adrs", h.handleADRCreate)
+	mux.HandleFunc("POST /adrs/{id}/update", h.handleADRUpdate)
+	mux.HandleFunc("POST /adrs/{id}/delete", h.handleADRDelete)
 }
 
 // funcMap holds template helpers used across views.

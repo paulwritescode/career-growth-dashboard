@@ -621,3 +621,9 @@ body.sidebar-collapsed .running-phase{opacity:0; width:0; overflow:hidden}
 
 /* Logstream items with tags need flex layout */
 .logstream .logline{display:flex; align-items:center; gap:var(--sp-xs); flex-wrap:wrap}
+
+/* --- Danger zone & small buttons ----------------------------------------- */
+.danger-zone{border-color:rgba(242,73,92,0.2); background:rgba(242,73,92,0.03)}
+.danger-zone .card-head{color:var(--red)}
+.danger-zone p{font-size:13px; margin:0 0 var(--sp-sm)}
+.btn-sm{padding:4px 8px; font-size:12px; min-width:auto}

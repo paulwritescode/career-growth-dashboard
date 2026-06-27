@@ -217,3 +217,72 @@ func (s *Service) GetADR(ctx context.Context, id int64) (domain.ADR, error) {
 func (s *Service) ListADRs(ctx context.Context) ([]domain.ADR, error) {
 	return s.store.ListADRs(ctx)
 }
+
+// DeletePost removes a post and its tiers. Records a career event.
+func (s *Service) DeletePost(ctx context.Context, id int64, src domain.EventSource) error {
+	post, err := s.store.GetPost(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.store.DeletePost(ctx, id); err != nil {
+		return err
+	}
+	s.appendEvent(ctx, "post.deleted", src, post.SprintID, &id, "Deleted post for "+post.PostDate, "")
+	return nil
+}
+
+// UpdateADR updates an existing ADR's fields. Records a career event.
+func (s *Service) UpdateADR(ctx context.Context, id int64, in CreateADRInput) (domain.ADR, error) {
+	adr, err := s.store.GetADR(ctx, id)
+	if err != nil {
+		return domain.ADR{}, err
+	}
+	if trim(in.Title) != "" {
+		adr.Title = trim(in.Title)
+	}
+	if in.Status != "" && in.Status.Valid() {
+		adr.Status = in.Status
+	}
+	if trim(in.DecidedOn) != "" {
+		d := trim(in.DecidedOn)
+		adr.DecidedOn = &d
+	}
+	if in.Problem != "" {
+		adr.Problem = in.Problem
+	}
+	if in.Options != "" {
+		adr.Options = in.Options
+	}
+	if in.Decision != "" {
+		adr.Decision = in.Decision
+	}
+	if in.Why != "" {
+		adr.Why = in.Why
+	}
+	if in.Consequences != "" {
+		adr.Consequences = in.Consequences
+	}
+	if in.SprintID != nil {
+		adr.SprintID = in.SprintID
+	}
+	if err := s.store.UpdateADR(ctx, adr); err != nil {
+		return domain.ADR{}, err
+	}
+	s.appendEvent(ctx, "adr.updated", in.Source, adr.SprintID, nil,
+		fmt.Sprintf("Updated ADR-%d: %s", adr.Number, adr.Title), "")
+	return s.store.GetADR(ctx, id)
+}
+
+// DeleteADR removes an ADR. Records a career event.
+func (s *Service) DeleteADR(ctx context.Context, id int64, src domain.EventSource) error {
+	adr, err := s.store.GetADR(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.store.DeleteADR(ctx, id); err != nil {
+		return err
+	}
+	s.appendEvent(ctx, "adr.deleted", src, adr.SprintID, nil,
+		fmt.Sprintf("Deleted ADR-%d: %s", adr.Number, adr.Title), "")
+	return nil
+}

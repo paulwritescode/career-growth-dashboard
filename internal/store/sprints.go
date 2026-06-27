@@ -186,3 +186,25 @@ func b2i(b bool) int {
 	}
 	return 0
 }
+
+// DeleteSprint removes a sprint and its associated checklist items.
+func (s *Store) DeleteSprint(ctx context.Context, id int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM checklist_items WHERE sprint_id = ?`, id); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM sprints WHERE id = ?`, id)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		_ = tx.Rollback()
+		return ErrNotFound
+	}
+	return tx.Commit()
+}

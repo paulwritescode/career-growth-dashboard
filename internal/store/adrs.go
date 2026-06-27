@@ -82,6 +82,34 @@ func (s *Store) MaxADRNumber(ctx context.Context) (int, error) {
 	return n, err
 }
 
+// UpdateADR persists all mutable fields of an ADR.
+func (s *Store) UpdateADR(ctx context.Context, a domain.ADR) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE adrs SET
+		sprint_id=?, number=?, title=?, status=?, decided_on=?, problem=?, options=?,
+		decision=?, why=?, consequences=?, updated_at=? WHERE id=?`,
+		nullInt(a.SprintID), a.Number, a.Title, a.Status, nullStr(a.DecidedOn),
+		a.Problem, a.Options, a.Decision, a.Why, a.Consequences, nowUTC(), a.ID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteADR removes an ADR by ID.
+func (s *Store) DeleteADR(ctx context.Context, id int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM adrs WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // --- career events --------------------------------------------------------
 
 // AppendEvent inserts a career event (append-only audit/log stream).

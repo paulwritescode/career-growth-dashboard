@@ -116,3 +116,16 @@ func (s *Service) WeekMaterial(ctx context.Context, sprintID *int64, anyDateInWe
 	return s.store.ListLogsByDateRange(ctx, sprintID,
 		monday.Format("2006-01-02"), sunday.Format("2006-01-02"))
 }
+
+// DeleteLog removes a daily log by ID. Records a career event.
+func (s *Service) DeleteLog(ctx context.Context, id int64, src domain.EventSource) error {
+	log, err := s.store.GetLog(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.store.DeleteLog(ctx, id); err != nil {
+		return err
+	}
+	s.appendEvent(ctx, "log.deleted", src, log.SprintID, nil, "Deleted log for "+log.LogDate, "")
+	return nil
+}

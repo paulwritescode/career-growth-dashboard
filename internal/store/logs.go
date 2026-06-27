@@ -159,3 +159,15 @@ func collectLogs(rows *sql.Rows) ([]domain.DailyLog, error) {
 	}
 	return out, rows.Err()
 }
+
+// DeleteLog removes a daily log by ID.
+func (s *Store) DeleteLog(ctx context.Context, id int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM daily_logs WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

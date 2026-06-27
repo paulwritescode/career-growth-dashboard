@@ -60,4 +60,13 @@
   {{end}}
 </div>
 {{end}}
+
+<!-- Delete post -->
+<div class="card danger-zone">
+  <div class="card-head">Danger Zone</div>
+  <p class="muted">Deleting a post removes all its tier content. This cannot be undone.</p>
+  <form method="post" action="/posts/{{$p.ID}}/delete" onsubmit="return confirm('Delete this post and all its tiers?')">
+    <button class="btn btn-danger" type="submit">Delete post</button>
+  </form>
+</div>
 {{end}}

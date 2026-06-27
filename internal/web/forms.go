@@ -262,3 +262,92 @@ func (h *Handlers) handleADRCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.redirect(w, r, "/adrs")
 }
+
+// --- DELETE handlers ------------------------------------------------------
+
+func (h *Handlers) handleSprintDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := h.svc.DeleteSprint(r.Context(), id, domain.SourceForm); err != nil {
+		h.userError(w, err)
+		return
+	}
+	h.redirect(w, r, "/sprints")
+}
+
+func (h *Handlers) handlePostDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := h.svc.DeletePost(r.Context(), id, domain.SourceForm); err != nil {
+		h.userError(w, err)
+		return
+	}
+	h.redirect(w, r, "/cadence")
+}
+
+func (h *Handlers) handleLogDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := h.svc.DeleteLog(r.Context(), id, domain.SourceForm); err != nil {
+		h.userError(w, err)
+		return
+	}
+	ref := r.Header.Get("Referer")
+	if ref == "" {
+		ref = "/logs"
+	}
+	h.redirect(w, r, ref)
+}
+
+func (h *Handlers) handleADRDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := h.svc.DeleteADR(r.Context(), id, domain.SourceForm); err != nil {
+		h.userError(w, err)
+		return
+	}
+	h.redirect(w, r, "/adrs")
+}
+
+func (h *Handlers) handleADRUpdate(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		h.userError(w, err)
+		return
+	}
+	num, _ := strconv.Atoi(formStr(r, "number"))
+	_, err = h.svc.UpdateADR(r.Context(), id, service.CreateADRInput{
+		Number:       num,
+		Title:        formStr(r, "title"),
+		Status:       domain.ADRStatus(formStr(r, "status")),
+		DecidedOn:    formStr(r, "decided_on"),
+		Problem:      formStr(r, "problem"),
+		Options:      formStr(r, "options"),
+		Decision:     formStr(r, "decision"),
+		Why:          formStr(r, "why"),
+		Consequences: formStr(r, "consequences"),
+		SprintID:     formInt64Ptr(r, "sprint_id"),
+		Source:       domain.SourceForm,
+	})
+	if err != nil {
+		h.userError(w, err)
+		return
+	}
+	h.redirect(w, r, "/adrs")
+}

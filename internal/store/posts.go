@@ -205,3 +205,25 @@ func (s *Store) GetTier(ctx context.Context, postID int64, tier domain.Tier) (do
 	}
 	return t, err
 }
+
+// DeletePost removes a post and its associated tiers.
+func (s *Store) DeletePost(ctx context.Context, id int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM post_tiers WHERE post_id = ?`, id); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM posts WHERE id = ?`, id)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		_ = tx.Rollback()
+		return ErrNotFound
+	}
+	return tx.Commit()
+}
