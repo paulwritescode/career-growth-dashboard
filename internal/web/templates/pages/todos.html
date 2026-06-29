@@ -1,0 +1,54 @@
+{{define "content"}}
+<div class="toolbar">
+  <a href="/todos" class="btn-ghost {{if not (eq .Flash "done")}}{{end}}">All</a>
+  <a href="/todos?status=open" class="btn-ghost">Open</a>
+  <a href="/todos?status=done" class="btn-ghost">Done</a>
+</div>
+
+<form method="POST" action="/todos" class="inline-form" style="margin-bottom:16px;">
+  <input type="text" name="text" placeholder="What needs doing?" style="flex:1;" required>
+  <select name="priority" style="width:100px;">
+    <option value="normal">Normal</option>
+    <option value="high">High</option>
+    <option value="low">Low</option>
+  </select>
+  <button type="submit" class="btn btn-primary" style="padding:10px 16px;">Add</button>
+</form>
+
+{{if .Todos}}
+<div class="stack">
+  {{range .Todos}}
+  <div class="card" style="padding:12px 16px; display:flex; align-items:center; gap:12px;">
+    {{if eq (print .Status) "open"}}
+    <form method="POST" action="/todos/{{.ID}}/status" style="margin:0;">
+      <input type="hidden" name="status" value="done">
+      <button type="submit" class="check-box" title="Mark done"></button>
+    </form>
+    {{else}}
+    <span class="check-box checked">✓</span>
+    {{end}}
+    <div style="flex:1;">
+      <span style="font-size:14px; color:var(--fg-0);{{if ne (print .Status) "open"}} text-decoration:line-through; color:var(--fg-2);{{end}}">{{.Text}}</span>
+      <div style="font-size:11px; color:var(--fg-2); margin-top:2px;">
+        {{if eq (print .Priority) "high"}}<span style="color:var(--red);">● high</span>{{end}}
+        {{if .DueOn}}<span>due {{derefStr .DueOn}}</span>{{end}}
+      </div>
+    </div>
+    {{if eq (print .Status) "open"}}
+    <form method="POST" action="/todos/{{.ID}}/status" style="margin:0;">
+      <input type="hidden" name="status" value="dropped">
+      <button type="submit" class="btn-ghost" style="padding:4px 8px; font-size:11px;">Drop</button>
+    </form>
+    {{end}}
+    <form method="POST" action="/todos/{{.ID}}/delete" style="margin:0;">
+      <button type="submit" class="btn-ghost" style="padding:4px 8px; font-size:11px; color:var(--red);">×</button>
+    </form>
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="card" style="text-align:center; padding:32px; color:var(--fg-2);">
+  <p>No todos yet. Add one above.</p>
+</div>
+{{end}}
+{{end}}

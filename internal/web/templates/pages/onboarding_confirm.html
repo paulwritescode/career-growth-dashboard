@@ -1,0 +1,54 @@
+{{define "title"}}Onboarding — Confirm{{end}}
+{{define "content"}}
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg-0);">
+  <div style="width:100%; max-width:600px; padding:32px;">
+    <!-- Step indicator -->
+    <div style="display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:32px;">
+      <span style="color:var(--fg-2); font-size:13px;">1</span>
+      <span style="width:40px; height:1px; background:var(--line);"></span>
+      <span style="color:var(--fg-2); font-size:13px;">2</span>
+      <span style="width:40px; height:1px; background:var(--line);"></span>
+      <span style="color:var(--fg-0); font-size:13px; font-weight:600;">3</span>
+    </div>
+
+    <div style="text-align:center; margin-bottom:24px;">
+      <h2 style="font-size:18px; color:var(--fg-0); margin:0 0 8px; font-weight:600;">You're all set</h2>
+      <p style="color:var(--fg-2); font-size:13px; margin:0;">Review your setup and launch your dashboard.</p>
+    </div>
+
+    <div class="card" style="padding:24px; margin-bottom:24px;">
+      <div style="margin-bottom:16px;">
+        <span style="font-size:11px; color:var(--fg-2); text-transform:uppercase; letter-spacing:0.08em;">Role</span>
+        <div style="font-size:14px; color:var(--fg-0); margin-top:4px;">{{.User.Role}}{{if .User.RoleOther}} — {{derefStr .User.RoleOther}}{{end}}</div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <span style="font-size:11px; color:var(--fg-2); text-transform:uppercase; letter-spacing:0.08em;">Active blocks</span>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+          {{range .Blocks}}
+          <span class="tag" style="border-color:var(--blue); color:var(--blue);">{{.Name}}</span>
+          {{end}}
+        </div>
+      </div>
+
+      {{if .Platforms}}
+      <div>
+        <span style="font-size:11px; color:var(--fg-2); text-transform:uppercase; letter-spacing:0.08em;">Post platforms</span>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+          {{range .Platforms}}
+          <span class="chip">{{.}}</span>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+
+    <form method="POST" action="/onboarding/confirm">
+      <div style="display:flex; justify-content:space-between;">
+        <a href="/onboarding/blocks" class="btn btn-secondary">Back</a>
+        <button type="submit" class="btn btn-primary">Launch dashboard</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}

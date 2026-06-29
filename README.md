@@ -1,171 +1,190 @@
 # local-scava
 
-A local-first, single-binary Go daemon that tracks the **career-growth** routine —
-the *Monthly Skill Sprint* and the *Three-Tier Content Cadence* — and serves a
-monochrome, SRE-style dashboard at `http://localhost:5500`.
+A local-first, single-binary Go daemon that tracks the **career-growth** routine
+and serves a Grafana-style dark dashboard at `http://localhost:3000`.
 
-Think of it as a private **Grafana for your career**: instead of CPU and latency,
-the "metrics, logs, and traces" are *did I ship a project this month, did I post
-today, what tier did I post on, am I on track for this sprint's phase*.
+Think of it as a private **Grafana / Datadog for your career**: instead of CPU
+and latency, the "metrics, logs, and traces" are *did I ship a project, did I
+post today, what tier did I post on, am I on track for this sprint's
+deliverables*.
 
-- **Metrics** — posting cadence rate, streaks, ship rate, tier-mix donut, phase health.
-- **Logs** — the daily build-log stream + an append-only career-event audit trail.
-- **Traces** — a sprint rendered as a phase waterfall (width ∝ time spent per phase).
+## What it does
 
-A built-in chat panel bridges the browser to `kiro-cli` over a WebSocket so you
-can create/update entries conversationally.
+- **Auth** — single operator login, cookie sessions, password hashing, API keys.
+- **Onboarding** — first-run wizard: pick your role, choose your blocks, launch a
+  dashboard shaped to what *you* track.
+- **Blocks** — toggleable feature modules. Enable/disable from Settings; the
+  sidebar, router, and API all respect your choice.
+- **Sprints** — bounded, deliverable-based sprints with computed health alerts
+  (on track / warning / at-risk / overdue).
+- **Metrics** — posting cadence rate, streaks, ship rate, tier-mix, health.
+- **Logs** — daily build-log stream + append-only career-event audit trail.
+- **Traces** — sprint as a phase waterfall (width ∝ time per phase).
+- **ADRs** — Architecture Decision Records, exportable as PDF.
+- **Posts** — content cadence across platforms (LinkedIn, X, Blog, Instagram, TikTok).
+- **Todos** — task management with priority, due dates, sprint linkage.
+- **Habits** — daily binary habits with heatmap and streak tracking.
+- **Weekly Review** — prompted end-of-week reflection, auto-populated from logs.
+- **PDF Export** — server-side PDF generation for sprint reports, ADRs, logs, metrics.
+- **REST API** — documented `POST /api/v1/logs`, metrics push, trace spans, etc.
+- **Command Palette** — `⌘K` / `Ctrl-K` fuzzy search across all entries.
+- **Chat** — built-in panel bridges the browser to `kiro-cli` over WebSocket.
 
 ## Requirements
 
 - **Go 1.25+** (`go version`).
-- A C toolchain — the embedded **libSQL** driver (`tursodatabase/go-libsql`) uses
-  cgo. On macOS the Xcode command-line tools (`xcode-select --install`) are
-  enough; on Linux install `gcc`/`build-essential`.
-- `kiro-cli` on your `PATH` **only if** you want the chat panel. The dashboard
-  runs fine without it.
+- A C toolchain — the embedded **libSQL** driver uses cgo. On macOS the Xcode
+  CLI tools (`xcode-select --install`) suffice; on Linux install `build-essential`.
+- `kiro-cli` on your `PATH` **only if** you want the chat panel.
 
 ## Quick start
 
 ```bash
-# from the repo root
-./run.sh
+./dev.sh           # build + run → http://127.0.0.1:3000
 ```
 
-`run.sh` builds the binary into `./bin/local-scava` (stamping the git short SHA as
-the version) and starts the daemon. When you see `dashboard ready`, open:
+On first run you'll hit the setup screen → set a password → onboarding wizard →
+dashboard.
 
-```
-http://localhost:5500
-```
-
-Press **Ctrl-C** to stop — the daemon shuts down gracefully (drains the HTTP
-server, kills any chat child processes, closes the database).
-
-### Passing options
-
-Any flags after `./run.sh` are forwarded to the binary:
+## dev.sh — the unified dev script
 
 ```bash
-./run.sh --addr 127.0.0.1:5600          # run on a different port
-./run.sh --db /tmp/scava.db             # use a throwaway database
-./run.sh --log-level debug              # verbose logs
-./run.sh --log-format json              # structured JSON logs
-./run.sh --migrate-only                 # apply DB migrations, then exit
-./run.sh --help                         # full flag list
+./dev.sh              # build + run (default mode)
+./dev.sh watch        # live-reload via air (restarts on file changes)
+./dev.sh fresh        # delete DB + start clean (forces /setup again)
+./dev.sh migrate      # apply pending migrations, then exit
+./dev.sh status       # show goose migration status
+./dev.sh down         # rollback the last migration
+./dev.sh build        # just compile the binary
+
+# Pass any flags to the binary:
+./dev.sh --log-level debug
+./dev.sh --addr 127.0.0.1:5500
+./dev.sh watch --log-level debug
 ```
 
 ## Running without the script
 
 ```bash
-# build
 go build -o bin/local-scava ./cmd/local-scava
-
-# run (foreground; logs to stderr)
 ./bin/local-scava
-
-# or run straight from source
-go run ./cmd/local-scava --addr 127.0.0.1:5500
+# or straight from source:
+go run ./cmd/local-scava
 ```
 
 ## Configuration
 
-Resolution order: **command-line flag → environment variable → default.**
+Resolution order: **flag → env var → default.**
 
 | Flag | Env | Default | Meaning |
 |---|---|---|---|
-| `--addr` | `SCAVA_ADDR` | `127.0.0.1:5500` | bind address (loopback only in v1) |
+| `--addr` | `SCAVA_ADDR` | `127.0.0.1:3000` | bind address (loopback only) |
 | `--db` | `SCAVA_DB` | `~/.local/share/local-scava/scava.db` | libSQL database file |
-| `--kiro-bin` | `SCAVA_KIRO_BIN` | `kiro-cli` (from `PATH`) | agent binary for the chat bridge |
-| `--kiro-trust-all` | `SCAVA_KIRO_TRUST_ALL=1` | `false` | let the chat agent run tools without confirmation (riskier) |
+| `--kiro-bin` | `SCAVA_KIRO_BIN` | `kiro-cli` | agent binary for the chat bridge |
+| `--kiro-trust-all` | `SCAVA_KIRO_TRUST_ALL=1` | `false` | agent tools without confirmation |
 | `--log-level` | `SCAVA_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
 | `--log-format` | `SCAVA_LOG_FORMAT` | `text` | `text` or `json` |
-| `--migrate-only` | — | `false` | run migrations then exit (no server) |
+| `--migrate-only` | — | `false` | run migrations then exit |
+| `--migrate-status` | — | `false` | print migration status then exit |
+| `--migrate-down` | — | `false` | rollback last migration then exit |
 
-The bind address is **restricted to loopback** (`127.0.0.1` / `localhost`); a
-non-loopback address is rejected at startup, because the chat bridge can execute
-an agent that mutates your data. See `specs/10-security.md` in the spec docs.
+## Migrations
 
-The database directory is created `0700` and the `scava.db` file is forced to
-`0600` (user-only).
-
-## Health check
+Managed by [goose](https://github.com/pressly/goose) with embedded SQL files.
+Migrations apply automatically on startup. CLI commands for manual control:
 
 ```bash
-curl http://localhost:5500/healthz
-# {"db":"ok","status":"ok"}
+./dev.sh migrate      # apply all pending
+./dev.sh status       # show applied vs pending
+./dev.sh down         # rollback one
 ```
 
-## Chat panel (kiro-cli bridge)
+Current schema: 9 migrations (`0001_init` through `0009_extend_enums`).
 
-The dashboard has a collapsible chat drawer (the **chat ▸** button in the top
-bar, on every page) that talks to a local `kiro-cli` over the `/ws` WebSocket.
-Each message you send runs one non-interactive `kiro-cli chat` turn; the answer
-streams back into the drawer as clean text (terminal color/cursor codes are
-stripped), and follow-up messages continue the same conversation.
+## REST API
 
-You can also **create entries by talking to it** — e.g. "log today that I wired
-the websocket bridge", "start a sprint learning Redis, microapp is a rate
-limiter", "mark today's LinkedIn post published, url https://…". The agent emits
-a structured `SCAVA-ACTION` directive that the bridge validates against an
-allowlist and routes through the **same service methods the web forms use**
-(recorded in the audit trail as `source=chat`). The affected dashboard view
-refreshes automatically when a chat action succeeds. Unrecognized actions are
-shown as plain text and never executed.
+Base URL: `http://localhost:3000/api/v1`
 
-- Requires `kiro-cli` on your `PATH` (or point `--kiro-bin` at it). If it isn't
-  found, the drawer reports the error and the rest of the dashboard keeps
-  working.
-- Creating entries via chat does **not** require `--kiro-trust-all` — the intent
-  directive is parsed by the bridge, not run as an agent tool. `--kiro-trust-all`
-  (or `SCAVA_KIRO_TRUST_ALL=1`) is only needed if you want the agent to run its
-  own tools (shell/fs) without confirmation — riskier; a loud warning is logged
-  at startup when it's on.
-- Security: the bridge launches `kiro-cli` with an explicit args array (never a
-  shell), validates WebSocket `Origin` + `Host` against a loopback allowlist, and
-  the agent only ever reaches the database through typed, validated, allowlisted
-  service methods — never raw SQL. See `specs/07-kiro-cli-chat-bridge.md` and
-  `specs/10-security.md`.
+All endpoints (except `/healthz`) require the `X-Scava-Key` header. Generate a
+key in Settings → API.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/healthz` | Health check (no auth) |
+| `POST` | `/api/v1/logs` | Append a build log |
+| `POST` | `/api/v1/events` | Record a career event |
+| `POST` | `/api/v1/metrics/push` | Push a metric data point |
+| `POST` | `/api/v1/traces/span` | Push a trace span |
+| `GET` | `/api/v1/sprints/active` | Current active sprint + health |
+| `GET` | `/api/v1/blocks` | List blocks with enabled state |
+
+Interactive docs at `/api/docs` (session-authenticated).
+
+## Auth flow
+
+```
+First run → /setup (set password) → /onboarding (role → blocks → confirm) → /
+Subsequent → /login → /
+```
+
+- Single operator account, cookie sessions, 14-day idle expiry.
+- Password hashed with SHA-256 + random salt, constant-time comparison.
+- API keys stored hashed; plaintext shown once at generation.
 
 ## Tests
 
 ```bash
 go test ./...        # unit tests (service, store, domain, bridge)
 go vet ./...         # static checks
-gofmt -l internal cmd # formatting (empty output = clean)
 ```
 
 ## Project layout
 
 ```
-cmd/local-scava/        entry point — wires config, store, services, HTTP server
+cmd/local-scava/        entry point
 internal/
-  app/                  daemon supervisor: config, lifecycle, graceful shutdown, /healthz
-  domain/               core entities + enums (Sprint, Post, PostTier, ADR, …)
-  store/                libSQL access, embedded migrations, parameterized queries
-  service/              business rules (sprint, content, logbook, metrics, traces)
-  web/                  HTTP handlers, html/template views, embedded static assets, SVG charts
-  bridge/               WebSocket ↔ kiro-cli stdio proxy (the chat panel)
-run.sh                  build + run helper
+  app/                  daemon: config, lifecycle, graceful shutdown
+  auth/                 login, sessions, API keys, middleware
+  block/                block registry + per-user enable/disable
+  onboarding/           three-step first-run wizard
+  export/               server-side PDF generation (fpdf)
+  domain/               entities + enums (Sprint, User, Todo, Habit, …)
+  store/                libSQL access, goose migrations, typed queries
+  service/              business rules (sprint health, cadence, metrics)
+  web/                  HTTP handlers, templates, static assets, REST API
+  bridge/               WebSocket ↔ kiro-cli chat proxy
+dev.sh                  unified build/run/migrate script
+.air.toml               live-reload config for `air`
 ```
-
-The full specification lives in the spec docs under
-`~/Documents/my-vault/local-scava` (`specs/00`–`10`, `schema/`, `naming.md`,
-`frontend-templates.md`).
 
 ## Routes
 
 | Route | Page |
 |---|---|
-| `/` | Overview — today status, current sprint, streaks |
-| `/sprints`, `/sprints/{id}` | sprint list + 12-month grid; detail with phase stepper, checklist, **trace** |
-| `/cadence`, `/posts/{id}` | posting heatmap + post list; per-tier post detail |
-| `/logs` | Logbook — career events + daily build logs |
-| `/adrs` | Architecture Decision Records |
-| `/metrics` | cadence rates, ship rate, streaks, **tier-mix donut** |
-| `/new` | quick-create hub (also reachable via **⌘K / Ctrl-K**) |
-| `/settings` | read-only config + security posture |
+| `/` | Overview (dynamic based on enabled blocks) |
+| `/sprints`, `/sprints/{id}` | Sprint list + detail with health, deliverables, trace |
+| `/cadence`, `/posts/{id}` | Posting heatmap + post detail |
+| `/logs` | Logbook — career events + daily logs |
+| `/adrs`, `/adrs/{id}` | Architecture Decision Records |
+| `/metrics` | Cadence rates, ship rate, streaks, tier-mix |
+| `/todos` | Todo list with priority + sprint linkage |
+| `/habits` | Habit tracker with heatmap + streaks |
+| `/review` | Weekly review (auto-populated) |
+| `/new` | Quick-create hub (⌘K / Ctrl-K) |
+| `/settings` | Profile, password, blocks toggle, daemon info |
+| `/api/docs` | REST API reference |
+| `/setup` | First-run password setup |
+| `/login` | Sign in |
+| `/onboarding/*` | First-run wizard (role → blocks → confirm) |
 | `/healthz` | JSON health probe |
 | `/ws` | WebSocket chat bridge |
 
-> Status: **v1.** Single user, single machine, manual start (no boot-on-startup,
-> no Docker, no auth beyond loopback) — all deliberate v1 non-goals.
+## Design
+
+- **Grafana-style dark theme** — dark canvas, semantic color for signal only
+  (green = healthy, yellow = watch, red = act).
+- **Dynamic sidebar** — only enabled blocks appear; toggles take effect immediately.
+- **Single binary** — all assets (CSS, JS, templates, migrations) embedded via
+  `embed.FS`. No external CDN, no Node runtime.
+- **Local-first** — loopback-bound, no cloud, no subscriptions, SQLite/libSQL.
+- **~22 MB stripped** binary, ~10,000 lines of Go.

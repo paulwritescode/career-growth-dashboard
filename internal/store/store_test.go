@@ -23,17 +23,19 @@ func TestMigrationsApply(t *testing.T) {
 	st := newTestStore(t)
 	ctx := context.Background()
 
-	var version int
-	if err := st.DB().QueryRowContext(ctx,
-		`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil {
+	version, err := st.MigrateVersion(ctx)
+	if err != nil {
 		t.Fatalf("read version: %v", err)
 	}
-	if version != 2 {
-		t.Fatalf("expected migration version 2, got %d", version)
+	if version != 9 {
+		t.Fatalf("expected migration version 9, got %d", version)
 	}
 
 	// All expected tables should exist.
-	for _, tbl := range []string{"sprints", "checklist_items", "daily_logs", "posts", "post_tiers", "adrs", "career_events"} {
+	for _, tbl := range []string{"sprints", "checklist_items", "daily_logs", "posts", "post_tiers", "adrs", "career_events",
+		"users", "sessions", "api_keys", "onboarding_state", "user_blocks", "user_platforms",
+		"deliverables", "sprint_templates", "habits", "habit_entries", "weekly_reviews", "todos",
+		"metric_points", "trace_spans"} {
 		var name string
 		err := st.DB().QueryRowContext(ctx,
 			`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl).Scan(&name)

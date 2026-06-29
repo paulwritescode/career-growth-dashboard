@@ -1,0 +1,28 @@
+# .air.toml — live-reload config for local-scava development.
+# Run with: air  (or ./dev.sh watch)
+# Docs: https://github.com/air-verse/air
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  # Build command
+  cmd = "go build -o ./tmp/local-scava ./cmd/local-scava"
+  # Entry point to run (replaces deprecated 'bin')
+  entrypoint = "./tmp/local-scava"
+  # Watch these file extensions for changes
+  include_ext = ["go", "html", "css", "js", "sql"]
+  # Directories to watch
+  include_dir = ["cmd", "internal"]
+  # Exclude directories
+  exclude_dir = ["tmp", "bin", ".git", ".kiro", ".vscode"]
+  # Delay before rebuilding (ms) — debounce rapid saves
+  delay = 500
+
+[log]
+  # Show timestamp in log
+  time = true
+
+[misc]
+  # Delete tmp dir on exit
+  clean_on_exit = true

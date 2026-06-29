@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  scava:
+    build:
+      context: .
+      args:
+        VERSION: "0.1.0-docker"
+    image: local-scava:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - scava-data:/var/lib/scava
+    environment:
+      - SCAVA_ADDR=0.0.0.0:3000
+      - SCAVA_DB=/var/lib/scava/scava.db
+      - SCAVA_LOG_LEVEL=info
+      - SCAVA_LOG_FORMAT=json
+    restart: unless-stopped
+
+volumes:
+  scava-data:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -12,7 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/paulkinyatti/local-scava/internal/auth"
+	"github.com/paulkinyatti/local-scava/internal/block"
 	"github.com/paulkinyatti/local-scava/internal/bridge"
+	"github.com/paulkinyatti/local-scava/internal/export"
+	"github.com/paulkinyatti/local-scava/internal/onboarding"
 	"github.com/paulkinyatti/local-scava/internal/service"
 	"github.com/paulkinyatti/local-scava/internal/store"
 	"github.com/paulkinyatti/local-scava/internal/web"
@@ -20,13 +25,16 @@ import (
 
 // App is the assembled daemon: config, logger, store, service, and HTTP server.
 type App struct {
-	cfg    Config
-	log    *slog.Logger
-	store  *store.Store
-	svc    *service.Service
-	web    *web.Handlers
-	bridge *bridge.Bridge
-	server *http.Server
+	cfg        Config
+	log        *slog.Logger
+	store      *store.Store
+	svc        *service.Service
+	auth       *auth.Service
+	block      *block.Service
+	onboarding *onboarding.Service
+	web        *web.Handlers
+	bridge     *bridge.Bridge
+	server     *http.Server
 }
 
 // New constructs an App: sets up logging, opens the store (running migrations),
@@ -51,7 +59,12 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 
 	svc := service.New(st)
 
-	webHandlers, err := web.New(svc, log, web.Meta{
+	authSvc := auth.New(st.DB())
+	blockSvc := block.New(st.DB())
+	onboardingSvc := onboarding.New(st.DB())
+	exportSvc := export.New(svc, st)
+
+	webHandlers, err := web.New(svc, authSvc, blockSvc, onboardingSvc, log, web.Meta{
 		Addr:    cfg.Addr,
 		DBPath:  cfg.DBPath,
 		KiroBin: cfg.KiroBin,
@@ -61,6 +74,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 		_ = st.Close()
 		return nil, err
 	}
+	webHandlers.SetExport(exportSvc)
 
 	// Allowed Origin/Host values for the chat bridge: the configured bind addr
 	// plus its localhost alias.
@@ -77,7 +91,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	br := bridge.New(cfg.KiroBin, allowedHosts, cfg.KiroTrustAll, svc, log)
 
-	a := &App{cfg: cfg, log: log, store: st, svc: svc, web: webHandlers, bridge: br}
+	a := &App{cfg: cfg, log: log, store: st, svc: svc, auth: authSvc, block: blockSvc, onboarding: onboardingSvc, web: webHandlers, bridge: br}
 	a.server = &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           a.routes(),
@@ -92,14 +106,17 @@ func (a *App) Service() *service.Service { return a.svc }
 // Logger exposes the structured logger.
 func (a *App) Logger() *slog.Logger { return a.log }
 
-// routes builds the HTTP handler. The dashboard UI and chat bridge are mounted
-// in later layers; v1 of this layer serves health and readiness only.
+// routes builds the HTTP handler. The auth middleware chain ensures setup comes
+// first, then session validation, then onboarding check, then block gating.
 func (a *App) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", a.handleHealthz)
 	mux.HandleFunc("GET /ws", a.bridge.HandleWS)
 	a.web.Mount(mux)
-	return a.validateHost(mux)
+
+	// Wrap with setup redirect (forces /setup when no users exist).
+	handler := a.auth.RequireSetup(a.validateHost(mux))
+	return handler
 }
 
 // validateHost rejects any request whose Host header is not a loopback host
@@ -229,5 +246,38 @@ func MigrateOnly(ctx context.Context, cfg Config) error {
 	if err != nil {
 		return err
 	}
+	v, _ := st.MigrateVersion(ctx)
+	fmt.Fprintf(os.Stdout, "migrations applied, current version: %d\n", v)
 	return st.Close()
+}
+
+// MigrateStatusCmd prints the status of all migrations.
+func MigrateStatusCmd(ctx context.Context, cfg Config) error {
+	if err := ensureDBDir(cfg.DBPath); err != nil {
+		return err
+	}
+	st, err := store.Open(ctx, cfg.DBPath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	return st.MigrateStatus(ctx)
+}
+
+// MigrateDownCmd rolls back the last migration.
+func MigrateDownCmd(ctx context.Context, cfg Config) error {
+	if err := ensureDBDir(cfg.DBPath); err != nil {
+		return err
+	}
+	st, err := store.Open(ctx, cfg.DBPath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	if err := st.MigrateDown(ctx); err != nil {
+		return err
+	}
+	v, _ := st.MigrateVersion(ctx)
+	fmt.Fprintf(os.Stdout, "rolled back, current version: %d\n", v)
+	return nil
 }

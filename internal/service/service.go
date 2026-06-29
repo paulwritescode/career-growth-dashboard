@@ -49,6 +49,10 @@ func New(st *store.Store) *Service {
 	}
 }
 
+// Store exposes the underlying store for direct access in handlers that need it
+// (e.g. new block CRUD that hasn't been wrapped in service methods yet).
+func (s *Service) Store() *store.Store { return s.store }
+
 // Today returns the current local calendar date as YYYY-MM-DD.
 func (s *Service) Today() string {
 	return s.now().In(s.loc).Format("2006-01-02")

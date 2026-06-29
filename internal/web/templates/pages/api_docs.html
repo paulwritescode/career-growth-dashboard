@@ -1,0 +1,30 @@
+{{define "content"}}
+<div class="card" style="padding:24px; margin-bottom:16px;">
+  <p style="color:var(--fg-2); font-size:13px; margin:0 0 12px;">
+    All endpoints require the <code style="font-family:var(--mono); background:var(--bg-2); padding:2px 6px; border-radius:3px;">X-Scava-Key</code> header except <code>/api/v1/healthz</code>.
+    Generate a key in <a href="/settings">Settings → API</a>.
+  </p>
+  <p style="color:var(--fg-2); font-size:13px; margin:0;">
+    Base URL: <code style="font-family:var(--mono); background:var(--bg-2); padding:2px 6px; border-radius:3px;">http://localhost:5500/api/v1</code>
+  </p>
+</div>
+
+{{range (apiEndpoints)}}
+<div class="card" style="padding:16px; margin-bottom:8px;">
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+    <span class="tag" style="font-size:10px; padding:2px 8px;
+      {{if eq .Method "GET"}}border-color:var(--blue); color:var(--blue);{{else}}border-color:var(--green); color:var(--green);{{end}}
+    ">{{.Method}}</span>
+    <code style="font-family:var(--mono); font-size:13px; color:var(--fg-0);">{{.Path}}</code>
+    {{if not .Auth}}<span class="tag" style="font-size:9px; border-color:var(--fg-2); color:var(--fg-2);">no auth</span>{{end}}
+  </div>
+  <p style="font-size:12px; color:var(--fg-2); margin:0 0 8px;">{{.Description}}</p>
+  {{if .Example}}
+  <details style="margin-top:8px;">
+    <summary style="font-size:11px; color:var(--fg-2); cursor:pointer;">Example</summary>
+    <pre style="font-family:var(--mono); font-size:11px; color:var(--fg-1); background:var(--bg-2); padding:10px; border-radius:4px; margin-top:6px; overflow-x:auto; white-space:pre-wrap;">{{.Example}}</pre>
+  </details>
+  {{end}}
+</div>
+{{end}}
+{{end}}

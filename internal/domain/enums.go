@@ -75,7 +75,7 @@ const (
 // Valid reports whether t is a known tier.
 func (t Tier) Valid() bool {
 	switch t {
-	case TierBlog, TierLinkedIn, TierX:
+	case TierBlog, TierLinkedIn, TierX, TierInstagram, TierTikTok:
 		return true
 	default:
 		return false
@@ -201,21 +201,122 @@ func (as ADRStatus) Valid() bool {
 }
 
 // EventSource records who triggered a career event: a web form, the chat
-// bridge, or the system itself.
+// bridge, the system itself, or the REST API.
 type EventSource string
 
 const (
 	SourceForm   EventSource = "form"
 	SourceChat   EventSource = "chat"
 	SourceSystem EventSource = "system"
+	SourceAPI    EventSource = "api"
 )
 
 // Valid reports whether es is a known event source.
 func (es EventSource) Valid() bool {
 	switch es {
-	case SourceForm, SourceChat, SourceSystem:
+	case SourceForm, SourceChat, SourceSystem, SourceAPI:
 		return true
 	default:
 		return false
 	}
 }
+
+// Tier extensions for phase 2 platforms.
+const (
+	TierInstagram Tier = "instagram"
+	TierTikTok   Tier = "tiktok"
+)
+
+// OnboardingStatus tracks the wizard progress.
+type OnboardingStatus string
+
+const (
+	OnboardingPending    OnboardingStatus = "pending"
+	OnboardingRoleDone   OnboardingStatus = "role_done"
+	OnboardingBlocksDone OnboardingStatus = "blocks_done"
+	OnboardingComplete   OnboardingStatus = "complete"
+)
+
+// Valid reports whether os is a known onboarding status.
+func (os OnboardingStatus) Valid() bool {
+	switch os {
+	case OnboardingPending, OnboardingRoleDone, OnboardingBlocksDone, OnboardingComplete:
+		return true
+	default:
+		return false
+	}
+}
+
+// UserRole is the role chosen at onboarding; used to suggest default blocks.
+type UserRole string
+
+const (
+	RoleBackend    UserRole = "backend"
+	RoleFrontend   UserRole = "frontend"
+	RoleFullstack  UserRole = "fullstack"
+	RoleDevOps     UserRole = "devops"
+	RoleData       UserRole = "data"
+	RoleIndie      UserRole = "indie"
+	RoleManager    UserRole = "manager"
+	RoleOther      UserRole = "other"
+)
+
+// Valid reports whether r is a known user role.
+func (r UserRole) Valid() bool {
+	switch r {
+	case RoleBackend, RoleFrontend, RoleFullstack, RoleDevOps,
+		RoleData, RoleIndie, RoleManager, RoleOther:
+		return true
+	default:
+		return false
+	}
+}
+
+// TodoStatus is the lifecycle state of a todo item.
+type TodoStatus string
+
+const (
+	TodoOpen    TodoStatus = "open"
+	TodoDone    TodoStatus = "done"
+	TodoDropped TodoStatus = "dropped"
+)
+
+// Valid reports whether ts is a known todo status.
+func (ts TodoStatus) Valid() bool {
+	switch ts {
+	case TodoOpen, TodoDone, TodoDropped:
+		return true
+	default:
+		return false
+	}
+}
+
+// TodoPriority is the urgency level of a todo.
+type TodoPriority string
+
+const (
+	PriorityLow    TodoPriority = "low"
+	PriorityNormal TodoPriority = "normal"
+	PriorityHigh   TodoPriority = "high"
+)
+
+// Valid reports whether tp is a known todo priority.
+func (tp TodoPriority) Valid() bool {
+	switch tp {
+	case PriorityLow, PriorityNormal, PriorityHigh:
+		return true
+	default:
+		return false
+	}
+}
+
+// Severity is the health severity of a sprint.
+type Severity string
+
+const (
+	SeveritySuccess Severity = "success"
+	SeverityWarning Severity = "warning"
+	SeverityAlert   Severity = "alert"
+	SeverityAlarm   Severity = "alarm"
+	SeverityNudge   Severity = "nudge"
+)

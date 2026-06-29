@@ -1,6 +1,7 @@
+-- +goose Up
 -- 0001_init.sql — core tables for local-scava.
 -- Pragmas (WAL, foreign_keys, busy_timeout) are set by the Go layer on connect,
--- not here. The schema_migrations bookkeeping table is created by the migrator.
+-- not here.
 
 CREATE TABLE sprints (
     id                  INTEGER PRIMARY KEY,
@@ -116,3 +117,11 @@ CREATE TABLE post_tiers (
 
 CREATE UNIQUE INDEX ux_post_tiers_post_tier ON post_tiers(post_id, tier);
 CREATE INDEX ix_post_tiers_status ON post_tiers(status);
+
+-- +goose Down
+DROP TABLE IF EXISTS post_tiers;
+DROP TABLE IF EXISTS adrs;
+DROP TABLE IF EXISTS posts;
+DROP TABLE IF EXISTS daily_logs;
+DROP TABLE IF EXISTS checklist_items;
+DROP TABLE IF EXISTS sprints;

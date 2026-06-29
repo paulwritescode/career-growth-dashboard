@@ -1,0 +1,8 @@
+.git
+.kiro
+.vscode
+bin/
+*.db
+*.db-journal
+*.db-wal
+tmp/

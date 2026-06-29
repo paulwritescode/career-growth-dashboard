@@ -34,61 +34,40 @@
     </button>
 
     <nav class="sidebar-nav">
-      <div class="nav-group"><span class="nav-group-text">Watch</span></div>
-      <a href="/" class="nav-item {{if eq .Nav "overview"}}active{{end}}" title="Overview">
-        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-        </svg>
-        <span class="nav-text">Overview</span>
-      </a>
-      <a href="/metrics" class="nav-item {{if eq .Nav "metrics"}}active{{end}}" title="Metrics">
-        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-        </svg>
-        <span class="nav-text">Metrics</span>
-      </a>
-
-      <div class="nav-group"><span class="nav-group-text">Sprints</span></div>
-      <a href="/sprints" class="nav-item {{if eq .Nav "sprints"}}active{{end}}" title="Sprints">
-        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-        </svg>
-        <span class="nav-text">Sprints</span>
-      </a>
-      <a href="/adrs" class="nav-item {{if eq .Nav "adrs"}}active{{end}}" title="ADRs">
-        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-        </svg>
-        <span class="nav-text">ADRs</span>
-      </a>
-
-      <div class="nav-group"><span class="nav-group-text">Cadence</span></div>
-      <a href="/cadence" class="nav-item {{if eq .Nav "cadence"}}active{{end}}" title="Cadence">
-        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-        </svg>
-        <span class="nav-text">Cadence</span>
-      </a>
-      <a href="/logs" class="nav-item {{if eq .Nav "logbook"}}active{{end}}" title="Logbook">
-        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-        </svg>
-        <span class="nav-text">Logbook</span>
-      </a>
-
-      <div class="nav-group"><span class="nav-group-text">Act</span></div>
-      <a href="/new" class="nav-item {{if eq .Nav "new"}}active{{end}}" title="New entry">
-        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
-        </svg>
-        <span class="nav-text">New entry</span>
-      </a>
-      <a href="/settings" class="nav-item {{if eq .Nav "settings"}}active{{end}}" title="Settings">
-        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-        <span class="nav-text">Settings</span>
-      </a>
+      {{$nav := .Nav}}
+      {{$lastGroup := ""}}
+      {{range .Sidebar}}
+        {{if ne .Group $lastGroup}}
+          <div class="nav-group"><span class="nav-group-text">{{.Group}}</span></div>
+          {{$lastGroup = .Group}}
+        {{end}}
+        {{if eq .Key "chat"}}
+        <a href="#" class="nav-item" id="nav-chat" title="Chat">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span class="nav-text">Chat</span>
+        </a>
+        {{else}}
+        <a href="{{.Href}}" class="nav-item {{if eq $nav .Key}}active{{end}}" title="{{.Name}}">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            {{if eq .Icon "grid"}}<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>{{end}}
+            {{if eq .Icon "bar-chart"}}<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>{{end}}
+            {{if eq .Icon "activity"}}<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>{{end}}
+            {{if eq .Icon "flame"}}<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>{{end}}
+            {{if eq .Icon "zap"}}<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>{{end}}
+            {{if eq .Icon "file-text"}}<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>{{end}}
+            {{if eq .Icon "calendar"}}<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>{{end}}
+            {{if eq .Icon "book"}}<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>{{end}}
+            {{if eq .Icon "check-square"}}<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>{{end}}
+            {{if eq .Icon "clipboard"}}<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>{{end}}
+            {{if eq .Icon "plus-circle"}}<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>{{end}}
+            {{if eq .Icon "settings"}}<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>{{end}}
+          </svg>
+          <span class="nav-text">{{.Name}}</span>
+        </a>
+        {{end}}
+      {{end}}
 
       {{if .HasActive}}
       <div class="nav-group"><span class="nav-group-text">Running</span></div>
@@ -263,6 +242,7 @@
     var fab = document.getElementById('fcw-fab');
     var win = document.getElementById('fcw-window');
     var closeBtn = document.getElementById('fcw-close');
+    var navChat = document.getElementById('nav-chat');
     var form = document.getElementById('fcw-form');
     var input = document.getElementById('fcw-input');
     var sendBtn = document.getElementById('fcw-send');
@@ -271,12 +251,21 @@
     var busy = false;
     var agentBubble = null;
 
+    function openChat(){
+      if(!fcw.classList.contains('fcw-open')){
+        fcw.classList.add('fcw-open');
+        if(!ws) connect();
+      }
+    }
+    function closeChat(){
+      fcw.classList.remove('fcw-open');
+    }
     function toggleChat(){
-      var isOpen = fcw.classList.toggle('fcw-open');
-      if(isOpen && !ws) connect();
+      if(fcw.classList.contains('fcw-open')) closeChat(); else openChat();
     }
     fab.addEventListener('click', toggleChat);
-    closeBtn.addEventListener('click', function(){ fcw.classList.remove('fcw-open'); });
+    closeBtn.addEventListener('click', closeChat);
+    if(navChat){ navChat.addEventListener('click', function(e){ e.preventDefault(); openChat(); }); }
 
     function appendMsg(type, text){
       var wrapper = document.createElement('div');
@@ -384,7 +373,7 @@
 
     // Expose for /new page AI flow buttons
     window.openChatWith = function(text){
-      if(!fcw.classList.contains('fcw-open')) toggleChat();
+      openChat();
       setTimeout(function(){
         appendAgentChunk(text);
         agentBubble = null;

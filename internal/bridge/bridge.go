@@ -93,8 +93,8 @@ type frame struct {
 }
 
 // New builds a Bridge that drives kiro-cli in non-interactive mode. allowedHosts
-// is the set of acceptable Host/Origin hosts (e.g. "127.0.0.1:5500",
-// "localhost:5500"). When trustAll is true the agent may run tools without
+// is the set of acceptable Host/Origin hosts (e.g. "127.0.0.1:3000",
+// "localhost:3000"). When trustAll is true the agent may run tools without
 // confirmation (passes -a) — a deliberate, riskier opt-in. runner executes
 // allowlisted mutation intents; pass nil to disable chat-driven mutations.
 func New(kiroBin string, allowedHosts []string, trustAll bool, runner IntentRunner, log *slog.Logger) *Bridge {

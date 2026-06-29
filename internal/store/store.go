@@ -2,6 +2,10 @@
 // returns domain types; no SQL escapes this package. It uses an embedded libSQL
 // database accessed via database/sql with the go-libsql driver.
 //
+// Migrations are managed by goose (github.com/pressly/goose/v3) using embedded
+// SQL files. This gives us rollback, status, dry-run, and Go-migration support
+// when needed.
+//
 // Layer rule: store imports domain and the driver only. Services call store;
 // store never calls services or the web layer.
 package store
@@ -11,12 +15,11 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"path/filepath"
-	"sort"
-	"strconv"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/pressly/goose/v3"
 	_ "github.com/tursodatabase/go-libsql"
 )
 
@@ -29,7 +32,7 @@ type Store struct {
 }
 
 // Open opens (creating if needed) the libSQL database at path, applies pragmas,
-// and runs any pending migrations. The caller must Close the returned Store.
+// and runs any pending migrations via goose. The caller must Close the returned Store.
 func Open(ctx context.Context, path string) (*Store, error) {
 	db, err := sql.Open("libsql", "file:"+path)
 	if err != nil {
@@ -74,112 +77,51 @@ func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
 // aggregations). Prefer the typed methods.
 func (s *Store) DB() *sql.DB { return s.db }
 
-type migration struct {
-	version int
-	name    string
-	sql     string
-}
-
-// migrate applies all embedded migrations whose version exceeds the highest
-// already-applied version, each inside its own transaction.
+// migrate runs all pending migrations using goose with embedded SQL files.
 func (s *Store) migrate(ctx context.Context) error {
-	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
-		version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`); err != nil {
-		return fmt.Errorf("create schema_migrations: %w", err)
+	goose.SetBaseFS(migrationsFS)
+
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return fmt.Errorf("goose set dialect: %w", err)
 	}
 
-	var current int
-	if err := s.db.QueryRowContext(ctx,
-		`SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&current); err != nil {
-		return fmt.Errorf("read current version: %w", err)
-	}
+	// Silence goose's default logging in normal operation.
+	goose.SetLogger(goose.NopLogger())
 
-	migs, err := loadMigrations()
-	if err != nil {
-		return err
-	}
-
-	applied := 0
-	for _, m := range migs {
-		if m.version <= current {
-			continue
-		}
-		tx, err := s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("begin tx for %s: %w", m.name, err)
-		}
-		for _, stmt := range splitStatements(m.sql) {
-			if _, err := tx.ExecContext(ctx, stmt); err != nil {
-				_ = tx.Rollback()
-				return fmt.Errorf("apply %s: %w", m.name, err)
-			}
-		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO schema_migrations(version, applied_at) VALUES(?, ?)`,
-			m.version, nowUTC()); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("record %s: %w", m.name, err)
-		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit %s: %w", m.name, err)
-		}
-		applied++
+	if err := goose.UpContext(ctx, s.db, "migrations"); err != nil {
+		return fmt.Errorf("goose up: %w", err)
 	}
 	return nil
 }
 
-// loadMigrations reads and sorts the embedded migration files. File names must
-// start with a zero-padded integer version, e.g. "0001_init.sql".
-func loadMigrations() ([]migration, error) {
-	entries, err := migrationsFS.ReadDir("migrations")
-	if err != nil {
-		return nil, fmt.Errorf("read migrations dir: %w", err)
+// MigrateStatus prints the current migration status (for CLI use).
+func (s *Store) MigrateStatus(ctx context.Context) error {
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return err
 	}
-	var migs []migration
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
-			continue
-		}
-		prefix := strings.SplitN(e.Name(), "_", 2)[0]
-		v, err := strconv.Atoi(prefix)
-		if err != nil {
-			return nil, fmt.Errorf("bad migration version in %q: %w", e.Name(), err)
-		}
-		b, err := migrationsFS.ReadFile(filepath.Join("migrations", e.Name()))
-		if err != nil {
-			return nil, fmt.Errorf("read %q: %w", e.Name(), err)
-		}
-		migs = append(migs, migration{version: v, name: e.Name(), sql: string(b)})
+	return goose.StatusContext(ctx, s.db, "migrations")
+}
+
+// MigrateDown rolls back the last migration.
+func (s *Store) MigrateDown(ctx context.Context) error {
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return err
 	}
-	sort.Slice(migs, func(i, j int) bool { return migs[i].version < migs[j].version })
-	return migs, nil
+	return goose.DownContext(ctx, s.db, "migrations")
+}
+
+// MigrateVersion returns the current schema version.
+func (s *Store) MigrateVersion(ctx context.Context) (int64, error) {
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return 0, err
+	}
+	return goose.GetDBVersionContext(ctx, s.db)
 }
 
 // --- shared helpers -------------------------------------------------------
-
-// splitStatements splits a migration file into individual SQL statements. The
-// libSQL driver executes only one statement per Exec call, so multi-statement
-// files must be split. Line comments (-- ...) are stripped. This relies on the
-// migration SQL containing no semicolons inside string literals (true for our
-// DDL-only migrations).
-func splitStatements(s string) []string {
-	var b strings.Builder
-	for _, line := range strings.Split(s, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "--") {
-			continue
-		}
-		b.WriteString(line)
-		b.WriteByte('\n')
-	}
-	var out []string
-	for _, part := range strings.Split(b.String(), ";") {
-		if stmt := strings.TrimSpace(part); stmt != "" {
-			out = append(out, stmt)
-		}
-	}
-	return out
-}
 
 const timeLayout = time.RFC3339
 
@@ -259,4 +201,12 @@ func timeFromNull(ns sql.NullString) *time.Time {
 	}
 	t := parseTime(ns.String)
 	return &t
+}
+
+// envOr returns the environment variable value or fallback (used by CLI subcommands).
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

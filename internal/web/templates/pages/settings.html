@@ -1,6 +1,94 @@
 {{define "content"}}
-<div class="card">
-  <div class="card-head">Daemon · read-only (v1)</div>
+{{if .Msg}}
+<div class="alert-bar success" style="margin-bottom:16px;">
+  <div class="alert-dot success"></div>
+  <span class="alert-label">Done</span>
+  <span class="alert-message">
+    {{if eq .Msg "profile_updated"}}Profile updated.{{end}}
+    {{if eq .Msg "password_changed"}}Password changed. Other sessions invalidated.{{end}}
+  </span>
+</div>
+{{end}}
+{{if .ErrMsg}}
+<div class="alert-bar critical" style="margin-bottom:16px;">
+  <div class="alert-dot critical"></div>
+  <span class="alert-label">Error</span>
+  <span class="alert-message">
+    {{if eq .ErrMsg "password_change_failed"}}Password change failed. Check your current password.{{end}}
+  </span>
+</div>
+{{end}}
+
+<!-- Profile Section -->
+{{if .User}}
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-head">Profile</div>
+  <form method="POST" action="/settings/profile" class="stack" style="margin-top:12px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div>
+        <label style="font-size:12px; color:var(--fg-2); display:block; margin-bottom:4px;">Display name</label>
+        <input type="text" name="display_name" value="{{.User.DisplayName}}" style="width:100%;">
+      </div>
+      <div>
+        <label style="font-size:12px; color:var(--fg-2); display:block; margin-bottom:4px;">Username</label>
+        <input type="text" name="username" value="{{.User.Username}}" style="width:100%;">
+      </div>
+    </div>
+    <div>
+      <label style="font-size:12px; color:var(--fg-2); display:block; margin-bottom:4px;">Avatar initials (1-2 chars)</label>
+      <input type="text" name="avatar_initials" value="{{.User.AvatarInitials}}" maxlength="2" style="width:80px;">
+    </div>
+    <div><button type="submit" class="btn btn-primary" style="padding:8px 16px;">Update profile</button></div>
+  </form>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-head">Change password</div>
+  <form method="POST" action="/settings/password" class="stack" style="margin-top:12px;">
+    <div>
+      <label style="font-size:12px; color:var(--fg-2); display:block; margin-bottom:4px;">Current password</label>
+      <input type="password" name="current_password" required style="width:100%;">
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div>
+        <label style="font-size:12px; color:var(--fg-2); display:block; margin-bottom:4px;">New password</label>
+        <input type="password" name="new_password" required minlength="8" style="width:100%;">
+      </div>
+      <div>
+        <label style="font-size:12px; color:var(--fg-2); display:block; margin-bottom:4px;">Confirm</label>
+        <input type="password" name="confirm_password" required minlength="8" style="width:100%;">
+      </div>
+    </div>
+    <div><button type="submit" class="btn btn-secondary" style="padding:8px 16px;">Change password</button></div>
+  </form>
+</div>
+{{end}}
+
+<!-- Blocks Section -->
+{{if .Blocks}}
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-head">Blocks</div>
+  <p style="font-size:12px; color:var(--fg-2); margin:4px 0 16px;">Toggle modules on your dashboard. Disabling hides the block — its data is preserved.</p>
+  <div class="stack">
+    {{range .Blocks}}
+    <div class="block-card card" style="margin-bottom:0;">
+      <div class="block-card-info">
+        <div class="block-card-name">{{.Name}}</div>
+        <div class="block-card-desc">{{.Description}}</div>
+        {{if .Metric}}<div class="block-card-metric">{{.Metric}}</div>{{end}}
+      </div>
+      <form method="POST" action="/settings/blocks/{{.Key}}" style="margin:0;">
+        <button type="submit" class="toggle {{if .Enabled}}on{{end}}" aria-label="Toggle {{.Name}}"></button>
+      </form>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<!-- Daemon Info -->
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-head">Daemon</div>
   <table class="table kv-table">
     <tbody>
       <tr><td class="muted">version</td><td class="mono">{{.Meta.Version}}</td></tr>
@@ -10,17 +98,17 @@
       <tr><td class="muted">today (local)</td><td class="mono">{{.Today}}</td></tr>
     </tbody>
   </table>
-  <p class="muted">Configuration is set at startup via flags / env vars (see <span class="mono">--help</span>). Editing from the UI is out of scope for v1.</p>
 </div>
 
 <div class="card">
-  <div class="card-head">Security posture (spec 10)</div>
+  <div class="card-head">Security posture</div>
   <ul class="settings-list">
     <li>Bound to loopback only — non-loopback binds are rejected.</li>
-    <li>WebSocket <span class="mono">Origin</span> allow-listed; <span class="mono">Host</span> header validated on every route (anti DNS-rebinding).</li>
+    <li>Session-based auth with hashed passwords (SHA-256 + salt).</li>
+    <li>WebSocket <span class="mono">Origin</span> allow-listed; <span class="mono">Host</span> header validated (anti DNS-rebinding).</li>
     <li>All SQL parameterized; the chat bridge never receives raw SQL or a shell.</li>
     <li>Database file created with <span class="mono">0600</span> permissions in a <span class="mono">0700</span> directory.</li>
-    <li>No authentication beyond loopback — a deliberate, documented v1 tradeoff.</li>
+    <li>API keys stored hashed; plaintext shown once at generation.</li>
   </ul>
 </div>
 {{end}}

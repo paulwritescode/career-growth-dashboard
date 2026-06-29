@@ -76,15 +76,15 @@ func TestBridgeBadBinary(t *testing.T) {
 }
 
 func TestCheckOrigin(t *testing.T) {
-	b := New("cat", []string{"127.0.0.1:5500", "localhost:5500"}, false, nil, quietLogger())
+	b := New("cat", []string{"127.0.0.1:3000", "localhost:3000"}, false, nil, quietLogger())
 
 	cases := []struct {
 		origin string
 		want   bool
 	}{
 		{"", true}, // non-browser client
-		{"http://127.0.0.1:5500", true},
-		{"http://localhost:5500", true},
+		{"http://127.0.0.1:3000", true},
+		{"http://localhost:3000", true},
 		{"http://evil.example.com", false},
 		{"http://127.0.0.1:9999", false},
 	}
@@ -100,9 +100,9 @@ func TestCheckOrigin(t *testing.T) {
 }
 
 func TestValidHost(t *testing.T) {
-	b := New("cat", []string{"127.0.0.1:5500"}, false, nil, quietLogger())
-	good := []string{"127.0.0.1:5500", "localhost:5500", "127.0.0.1:1234", "[::1]:5500"}
-	bad := []string{"evil.example.com", "192.168.1.5:5500", "10.0.0.1:80"}
+	b := New("cat", []string{"127.0.0.1:3000"}, false, nil, quietLogger())
+	good := []string{"127.0.0.1:3000", "localhost:3000", "127.0.0.1:1234", "[::1]:3000"}
+	bad := []string{"evil.example.com", "192.168.1.5:3000", "10.0.0.1:80"}
 	for _, h := range good {
 		if !b.validHost(h) {
 			t.Errorf("validHost(%q) = false, want true", h)

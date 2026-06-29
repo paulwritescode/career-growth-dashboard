@@ -1,6 +1,6 @@
 // Command local-scava is a local-first daemon that tracks the career-growth
 // routine (Monthly Skill Sprint + Three-Tier Content Cadence) and serves a
-// monochrome, SRE-style dashboard at http://localhost:5500.
+// monochrome, SRE-style dashboard at http://localhost:3000.
 package main
 
 import (
@@ -37,6 +37,12 @@ func run(args []string) error {
 
 	if cfg.MigrateOnly {
 		return app.MigrateOnly(ctx, cfg)
+	}
+	if cfg.MigrateStatus {
+		return app.MigrateStatusCmd(ctx, cfg)
+	}
+	if cfg.MigrateDown {
+		return app.MigrateDownCmd(ctx, cfg)
 	}
 
 	a, err := app.New(ctx, cfg)

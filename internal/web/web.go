@@ -17,7 +17,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/paulkinyatti/local-scava/internal/auth"
+	"github.com/paulkinyatti/local-scava/internal/block"
 	"github.com/paulkinyatti/local-scava/internal/domain"
+	"github.com/paulkinyatti/local-scava/internal/export"
+	"github.com/paulkinyatti/local-scava/internal/onboarding"
 	"github.com/paulkinyatti/local-scava/internal/service"
 )
 
@@ -37,16 +41,20 @@ type Meta struct {
 
 // Handlers holds the dependencies shared by all HTTP handlers.
 type Handlers struct {
-	svc       *service.Service
-	log       *slog.Logger
-	meta      Meta
-	templates map[string]*template.Template // page name -> parsed template set
-	static    http.Handler
+	svc        *service.Service
+	auth       *auth.Service
+	block      *block.Service
+	onboarding *onboarding.Service
+	export     *export.Service
+	log        *slog.Logger
+	meta       Meta
+	templates  map[string]*template.Template // page name -> parsed template set
+	static     http.Handler
 }
 
 // New builds the web handlers, parsing all page templates against the shared
 // layout and partials.
-func New(svc *service.Service, log *slog.Logger, meta Meta) (*Handlers, error) {
+func New(svc *service.Service, authSvc *auth.Service, blockSvc *block.Service, onboardingSvc *onboarding.Service, log *slog.Logger, meta Meta) (*Handlers, error) {
 	tmpls, err := buildTemplates()
 	if err != nil {
 		return nil, err
@@ -56,11 +64,14 @@ func New(svc *service.Service, log *slog.Logger, meta Meta) (*Handlers, error) {
 		return nil, err
 	}
 	return &Handlers{
-		svc:       svc,
-		log:       log,
-		meta:      meta,
-		templates: tmpls,
-		static:    http.StripPrefix("/static/", http.FileServer(http.FS(sub))),
+		svc:        svc,
+		auth:       authSvc,
+		block:      blockSvc,
+		onboarding: onboardingSvc,
+		log:        log,
+		meta:       meta,
+		templates:  tmpls,
+		static:     http.StripPrefix("/static/", http.FileServer(http.FS(sub))),
 	}, nil
 }
 
@@ -68,6 +79,22 @@ func New(svc *service.Service, log *slog.Logger, meta Meta) (*Handlers, error) {
 func (h *Handlers) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /static/", h.static)
 
+	// Auth routes (no session required).
+	mux.HandleFunc("GET /setup", h.handleSetupForm)
+	mux.HandleFunc("POST /setup", h.handleSetupSubmit)
+	mux.HandleFunc("GET /login", h.handleLoginForm)
+	mux.HandleFunc("POST /login", h.handleLoginSubmit)
+	mux.HandleFunc("POST /logout", h.handleLogout)
+
+	// Onboarding routes (session required, but not onboarding-complete).
+	mux.HandleFunc("GET /onboarding/role", h.handleOnboardingRole)
+	mux.HandleFunc("POST /onboarding/role", h.handleOnboardingRoleSubmit)
+	mux.HandleFunc("GET /onboarding/blocks", h.handleOnboardingBlocks)
+	mux.HandleFunc("POST /onboarding/blocks", h.handleOnboardingBlocksSubmit)
+	mux.HandleFunc("GET /onboarding/confirm", h.handleOnboardingConfirm)
+	mux.HandleFunc("POST /onboarding/confirm", h.handleOnboardingConfirmSubmit)
+
+	// Dashboard routes (session + onboarding complete required).
 	mux.HandleFunc("GET /{$}", h.handleOverview)
 	mux.HandleFunc("GET /sprints", h.handleSprintList)
 	mux.HandleFunc("GET /sprints/{id}", h.handleSprintDetail)
@@ -79,7 +106,14 @@ func (h *Handlers) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /new", h.handleNew)
 	mux.HandleFunc("GET /settings", h.handleSettings)
 
-	// Mutating form routes (task 8 wires the bodies; declared here so the nav works).
+	// Block toggle.
+	mux.HandleFunc("POST /settings/blocks/{key}", h.handleBlockToggle)
+
+	// Profile and password.
+	mux.HandleFunc("POST /settings/profile", h.handleProfileUpdate)
+	mux.HandleFunc("POST /settings/password", h.handlePasswordChange)
+
+	// Mutating form routes.
 	mux.HandleFunc("POST /sprints", h.handleSprintCreate)
 	mux.HandleFunc("POST /sprints/{id}/phase", h.handleSprintPhase)
 	mux.HandleFunc("POST /sprints/{id}/status", h.handleSprintStatus)
@@ -94,6 +128,38 @@ func (h *Handlers) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("POST /adrs", h.handleADRCreate)
 	mux.HandleFunc("POST /adrs/{id}/update", h.handleADRUpdate)
 	mux.HandleFunc("POST /adrs/{id}/delete", h.handleADRDelete)
+
+	// PDF export routes.
+	mux.HandleFunc("GET /sprints/{id}/export.pdf", h.handleSprintExport)
+	mux.HandleFunc("GET /adrs/{id}/export.pdf", h.handleADRExport)
+	mux.HandleFunc("GET /logs/export.pdf", h.handleLogExport)
+	mux.HandleFunc("GET /metrics/export.pdf", h.handleMetricsExport)
+
+	// New block routes.
+	mux.HandleFunc("GET /todos", h.handleTodos)
+	mux.HandleFunc("POST /todos", h.handleTodoCreate)
+	mux.HandleFunc("POST /todos/{id}/status", h.handleTodoStatus)
+	mux.HandleFunc("POST /todos/{id}/delete", h.handleTodoDelete)
+	mux.HandleFunc("GET /habits", h.handleHabits)
+	mux.HandleFunc("POST /habits", h.handleHabitCreate)
+	mux.HandleFunc("POST /habits/{id}/toggle", h.handleHabitToggle)
+	mux.HandleFunc("GET /review", h.handleReview)
+	mux.HandleFunc("POST /review", h.handleReviewSave)
+
+	// API docs.
+	mux.HandleFunc("GET /api/docs", h.handleAPIDocs)
+
+	// Command palette search.
+	mux.HandleFunc("GET /api/search", h.handleSearch)
+
+	// REST API v1.
+	h.MountAPI(mux)
+}
+
+// roleItem is a helper for templates to render role options.
+type roleItem struct {
+	Value string
+	Label string
 }
 
 // funcMap holds template helpers used across views.
@@ -108,6 +174,18 @@ func funcMap() template.FuncMap {
 		"pct":    func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
 		"phases": domain.AllPhases,
 		"tiers":  domain.AllTiers,
+		"roles": func() []roleItem {
+			return []roleItem{
+				{"backend", "Backend engineer"},
+				{"frontend", "Frontend engineer"},
+				{"fullstack", "Full-stack engineer"},
+				{"devops", "DevOps / SRE / Platform"},
+				{"data", "Data / ML engineer"},
+				{"indie", "Indie hacker / solo founder"},
+				{"manager", "Engineering manager"},
+				{"other", "Other"},
+			}
+		},
 		"shortDate": func(s string) string {
 			if len(s) >= 10 {
 				return s[:10]
@@ -129,12 +207,41 @@ func funcMap() template.FuncMap {
 		"uptime":       uptimeSVG,
 		"progressRing": progressRingSVG,
 		"activityFeed": activityFeedHTML,
+		// Phase-2 template helpers.
+		"seq": func(from, to int) []int {
+			var out []int
+			if from >= to {
+				for i := from; i >= to; i-- {
+					out = append(out, i)
+				}
+			} else {
+				for i := from; i <= to; i++ {
+					out = append(out, i)
+				}
+			}
+			return out
+		},
+		"daysAgo": func(n int) string {
+			return time.Now().AddDate(0, 0, -n).Format("2006-01-02")
+		},
+		"inSlice": func(slice []string, item string) bool {
+			for _, s := range slice {
+				if s == item {
+					return true
+				}
+			}
+			return false
+		},
+		"apiEndpoints": func() []apiEndpoint {
+			return apiEndpointList()
+		},
 	}
 }
 
 // buildTemplates parses layout + partials + each page into its own set.
 func buildTemplates() (map[string]*template.Template, error) {
 	base := []string{"templates/layout.html"}
+	chromeless := []string{"templates/chromeless.html"}
 	partials, err := fs.Glob(templatesFS, "templates/partials/*.html")
 	if err != nil {
 		return nil, err
@@ -146,12 +253,34 @@ func buildTemplates() (map[string]*template.Template, error) {
 	if len(pages) == 0 {
 		return nil, fmt.Errorf("no page templates found")
 	}
+
+	// Pages that use the chromeless layout (no sidebar/topbar).
+	chromelessPages := map[string]bool{
+		"setup":              true,
+		"login":              true,
+		"onboarding_role":    true,
+		"onboarding_blocks":  true,
+		"onboarding_confirm": true,
+	}
+
 	out := make(map[string]*template.Template, len(pages))
 	for _, page := range pages {
 		name := baseName(page)
-		files := append(append([]string{}, base...), partials...)
+		var layout []string
+		if chromelessPages[name] {
+			layout = chromeless
+		} else {
+			layout = base
+		}
+		files := append(append([]string{}, layout...), partials...)
 		files = append(files, page)
-		t, err := template.New("layout.html").Funcs(funcMap()).ParseFS(templatesFS, files...)
+
+		defName := "layout.html"
+		if chromelessPages[name] {
+			defName = "chromeless.html"
+		}
+
+		t, err := template.New(defName).Funcs(funcMap()).ParseFS(templatesFS, files...)
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", page, err)
 		}
@@ -173,7 +302,16 @@ func baseName(p string) string {
 	return p
 }
 
-// render executes the named page template's "base" definition with data.
+// chromelessPages is the set of page template names that use the chromeless layout.
+var chromelessPages = map[string]bool{
+	"setup":              true,
+	"login":              true,
+	"onboarding_role":    true,
+	"onboarding_blocks":  true,
+	"onboarding_confirm": true,
+}
+
+// render executes the named page template's layout definition with data.
 func (h *Handlers) render(w http.ResponseWriter, page string, data any) {
 	t, ok := h.templates[page]
 	if !ok {
@@ -181,7 +319,11 @@ func (h *Handlers) render(w http.ResponseWriter, page string, data any) {
 		return
 	}
 	var buf bytes.Buffer
-	if err := t.ExecuteTemplate(&buf, "base", data); err != nil {
+	defName := "base"
+	if chromelessPages[page] {
+		defName = "chromeless"
+	}
+	if err := t.ExecuteTemplate(&buf, defName, data); err != nil {
 		h.serverError(w, fmt.Errorf("execute %q: %w", page, err))
 		return
 	}

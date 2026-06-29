@@ -13,14 +13,16 @@ import (
 // Config holds the daemon's runtime configuration. Resolution order is
 // command-line flag > environment variable > default.
 type Config struct {
-	Addr         string // bind address; loopback only in v1
-	DBPath       string // libSQL database file
-	KiroBin      string // kiro-cli binary for the chat bridge
-	KiroTrustAll bool   // allow the chat agent to run tools without confirmation
-	LogLevel     string // debug|info|warn|error
-	LogFormat    string // text|json
-	MigrateOnly  bool   // run migrations then exit
-	Version      string // build version, for the settings/status display
+	Addr          string // bind address; loopback only in v1
+	DBPath        string // libSQL database file
+	KiroBin       string // kiro-cli binary for the chat bridge
+	KiroTrustAll  bool   // allow the chat agent to run tools without confirmation
+	LogLevel      string // debug|info|warn|error
+	LogFormat     string // text|json
+	MigrateOnly   bool   // run migrations then exit
+	MigrateStatus bool   // print migration status then exit
+	MigrateDown   bool   // roll back the last migration then exit
+	Version       string // build version, for the settings/status display
 }
 
 // envOr returns the environment variable value or a fallback.
@@ -45,13 +47,15 @@ func defaultDBPath() string {
 func Load(args []string) (Config, error) {
 	fs := flag.NewFlagSet("local-scava", flag.ContinueOnError)
 	cfg := Config{}
-	fs.StringVar(&cfg.Addr, "addr", envOr("SCAVA_ADDR", "127.0.0.1:5500"), "bind address (loopback only in v1)")
+	fs.StringVar(&cfg.Addr, "addr", envOr("SCAVA_ADDR", "127.0.0.1:3000"), "bind address (loopback only in v1)")
 	fs.StringVar(&cfg.DBPath, "db", envOr("SCAVA_DB", defaultDBPath()), "libSQL database file path")
 	fs.StringVar(&cfg.KiroBin, "kiro-bin", envOr("SCAVA_KIRO_BIN", "kiro-cli"), "kiro-cli binary for the chat bridge")
 	fs.BoolVar(&cfg.KiroTrustAll, "kiro-trust-all", envOr("SCAVA_KIRO_TRUST_ALL", "") == "1", "let the chat agent run tools without confirmation (riskier)")
 	fs.StringVar(&cfg.LogLevel, "log-level", envOr("SCAVA_LOG_LEVEL", "info"), "log level: debug|info|warn|error")
 	fs.StringVar(&cfg.LogFormat, "log-format", envOr("SCAVA_LOG_FORMAT", "text"), "log format: text|json")
 	fs.BoolVar(&cfg.MigrateOnly, "migrate-only", false, "run migrations then exit")
+	fs.BoolVar(&cfg.MigrateStatus, "migrate-status", false, "print migration status then exit")
+	fs.BoolVar(&cfg.MigrateDown, "migrate-down", false, "roll back the last migration then exit")
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
 	}
@@ -64,7 +68,9 @@ func (c Config) validate() (Config, error) {
 	if c.Addr == "" {
 		return Config{}, fmt.Errorf("addr must not be empty")
 	}
-	if !isLoopback(c.Addr) {
+	// SCAVA_CONTAINER=1 disables the loopback guard, allowing 0.0.0.0 binding
+	// inside Docker containers where port mapping requires a non-loopback addr.
+	if os.Getenv("SCAVA_CONTAINER") != "1" && !isLoopback(c.Addr) {
 		// v1 hard-restricts to loopback; exposing the command-executing chat
 		// bridge to the network is gated behind future explicit work.
 		return Config{}, fmt.Errorf("addr %q is not a loopback address; v1 binds 127.0.0.1/localhost only (see specs/10-security.md)", c.Addr)

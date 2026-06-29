@@ -6,9 +6,19 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/paulkinyatti/local-scava/internal/block"
 	"github.com/paulkinyatti/local-scava/internal/domain"
 	"github.com/paulkinyatti/local-scava/internal/service"
 )
+
+// SidebarItem represents one entry in the dynamic sidebar.
+type SidebarItem struct {
+	Key   string // block key or fixed key like "overview"
+	Name  string
+	Href  string
+	Icon  string // SVG path content
+	Group string // sidebar group
+}
 
 // pageBase carries fields common to every page (for the layout/sidebar).
 type pageBase struct {
@@ -20,6 +30,7 @@ type pageBase struct {
 	ActiveID    int64  // active sprint's ID (for linking)
 	ActiveSkill string // active sprint's skill name
 	ActivePhase int    // active sprint's current phase number
+	Sidebar     []SidebarItem // dynamic sidebar entries based on enabled blocks
 }
 
 func (h *Handlers) base(title, nav string) pageBase {
@@ -30,7 +41,59 @@ func (h *Handlers) base(title, nav string) pageBase {
 		pb.ActiveSkill = sp.SkillName
 		pb.ActivePhase = int(sp.CurrentPhase)
 	}
+	pb.Sidebar = h.buildSidebar()
 	return pb
+}
+
+// buildSidebar constructs the dynamic sidebar entries from enabled blocks.
+func (h *Handlers) buildSidebar() []SidebarItem {
+	// Try to get user ID from context. For the sidebar, we use user 1 (single-user app).
+	userID := int64(1)
+	enabled, _ := h.block.Enabled(context.Background(), userID)
+	enabledKeys := make(map[string]bool, len(enabled))
+	for _, d := range enabled {
+		enabledKeys[d.Key] = true
+	}
+
+	var items []SidebarItem
+
+	// Always-present items first.
+	items = append(items, SidebarItem{Key: "overview", Name: "Overview", Href: "/", Icon: "grid", Group: "Watch"})
+
+	// Block-driven items, grouped.
+	type blockNav struct {
+		key   string
+		name  string
+		href  string
+		icon  string
+		group string
+		nav   string // the Nav key for active highlight
+	}
+	allBlocks := []blockNav{
+		{"metrics", "Metrics", "/metrics", "bar-chart", "Watch", "metrics"},
+		{"traces", "Traces", "/traces", "activity", "Watch", "traces"},
+		{"habits", "Habits", "/habits", "flame", "Watch", "habits"},
+		{"sprint", "Sprints", "/sprints", "zap", "Sprints", "sprints"},
+		{"adr", "ADRs", "/adrs", "file-text", "Sprints", "adrs"},
+		{"posts", "Cadence", "/cadence", "calendar", "Cadence", "cadence"},
+		{"logs", "Logbook", "/logs", "book", "Cadence", "logbook"},
+		{"todo", "Todos", "/todos", "check-square", "Act", "todos"},
+		{"review", "Weekly Review", "/review", "clipboard", "Act", "review"},
+	}
+
+	for _, b := range allBlocks {
+		if enabledKeys[b.key] {
+			items = append(items, SidebarItem{Key: b.nav, Name: b.name, Href: b.href, Icon: b.icon, Group: b.group})
+		}
+	}
+
+	// Always-present: New entry, Chat, Settings.
+	items = append(items,
+		SidebarItem{Key: "new", Name: "New entry", Href: "/new", Icon: "plus-circle", Group: "Act"},
+		SidebarItem{Key: "settings", Name: "Settings", Href: "/settings", Icon: "settings", Group: "Act"},
+	)
+
+	return items
 }
 
 func parseID(r *http.Request) (int64, error) {
@@ -360,11 +423,57 @@ func (h *Handlers) handleNew(w http.ResponseWriter, r *http.Request) {
 
 // --- Settings (read-only config view) -------------------------------------
 
+// BlockCard represents a block with toggle state for the settings page.
+type BlockCard struct {
+	Key         string
+	Name        string
+	Description string
+	Enabled     bool
+	Metric      string // e.g. "14 ADRs"
+}
+
 type settingsData struct {
 	pageBase
-	Meta Meta
+	Meta       Meta
+	User       *domain.User
+	Blocks     []BlockCard
+	Msg        string
+	ErrMsg     string
 }
 
 func (h *Handlers) handleSettings(w http.ResponseWriter, r *http.Request) {
-	h.render(w, "settings", settingsData{pageBase: h.base("Settings", "settings"), Meta: h.meta})
+	userID, _ := h.currentUserID(r)
+
+	data := settingsData{
+		pageBase: h.base("Settings", "settings"),
+		Meta:     h.meta,
+		Msg:      r.URL.Query().Get("msg"),
+		ErrMsg:   r.URL.Query().Get("err"),
+	}
+
+	// Load user profile.
+	if userID > 0 {
+		user, err := h.auth.GetUser(r.Context(), userID)
+		if err == nil {
+			data.User = &user
+		}
+	}
+
+	// Load block cards with toggle state and metrics.
+	if userID > 0 {
+		metrics, _ := h.block.Metrics(r.Context(), userID)
+		for _, def := range block.Registry() {
+			enabled, _ := h.block.IsEnabled(r.Context(), userID, def.Key)
+			card := BlockCard{
+				Key:         def.Key,
+				Name:        def.Name,
+				Description: def.Description,
+				Enabled:     enabled,
+				Metric:      metrics[def.Key],
+			}
+			data.Blocks = append(data.Blocks, card)
+		}
+	}
+
+	h.render(w, "settings", data)
 }

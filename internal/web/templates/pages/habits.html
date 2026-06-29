@@ -1,0 +1,41 @@
+{{define "content"}}
+<form method="POST" action="/habits" class="inline-form" style="margin-bottom:16px;">
+  <input type="text" name="name" placeholder="New habit (e.g. commit daily)" style="flex:1;" required>
+  <button type="submit" class="btn btn-primary" style="padding:10px 16px;">Add habit</button>
+</form>
+
+{{if .Habits}}
+<div class="stack">
+  {{range .Habits}}
+  <div class="card" style="padding:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <span style="font-size:14px; color:var(--fg-0); font-weight:500;">{{.Name}}</span>
+      <div style="display:flex; align-items:center; gap:12px;">
+        {{$streak := index $.Streaks .ID}}
+        {{if gt $streak 0}}
+        <span style="font-size:12px; color:var(--green); font-family:var(--mono);">🔥 {{$streak}}d</span>
+        {{end}}
+        <form method="POST" action="/habits/{{.ID}}/toggle" style="margin:0;">
+          <button type="submit" class="btn-ghost" style="padding:6px 12px; font-size:12px;">
+            Toggle today
+          </button>
+        </form>
+      </div>
+    </div>
+    <!-- Mini heatmap (last 30 days) -->
+    <div class="heatmap" style="grid-template-columns:repeat(30,1fr); max-width:100%;">
+      {{$entries := index $.Entries .ID}}
+      {{range $i := (seq 29 0)}}
+        {{$date := (daysAgo $i)}}
+        <span class="hcell {{if (inSlice $entries $date)}}h3{{else}}h0{{end}}" title="{{$date}}"></span>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="card" style="text-align:center; padding:32px; color:var(--fg-2);">
+  <p>No habits tracked yet. Add one above to start building streaks.</p>
+</div>
+{{end}}
+{{end}}

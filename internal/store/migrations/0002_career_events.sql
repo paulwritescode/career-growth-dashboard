@@ -1,3 +1,4 @@
+-- +goose Up
 -- 0002_career_events.sql — append-only audit/log stream for the SRE "logs" view.
 
 CREATE TABLE career_events (
@@ -15,3 +16,6 @@ CREATE TABLE career_events (
 
 CREATE INDEX ix_career_events_time ON career_events(occurred_at);
 CREATE INDEX ix_career_events_kind ON career_events(kind);
+
+-- +goose Down
+DROP TABLE IF EXISTS career_events;

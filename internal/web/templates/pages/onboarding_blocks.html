@@ -1,0 +1,69 @@
+{{define "title"}}Onboarding — Blocks{{end}}
+{{define "content"}}
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg-0);">
+  <div style="width:100%; max-width:700px; padding:32px;">
+    <!-- Step indicator -->
+    <div style="display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:32px;">
+      <span style="color:var(--fg-2); font-size:13px;">1</span>
+      <span style="width:40px; height:1px; background:var(--line);"></span>
+      <span style="color:var(--fg-0); font-size:13px; font-weight:600;">2</span>
+      <span style="width:40px; height:1px; background:var(--line);"></span>
+      <span style="color:var(--fg-2); font-size:13px;">3</span>
+    </div>
+
+    <div style="text-align:center; margin-bottom:24px;">
+      <h2 style="font-size:18px; color:var(--fg-0); margin:0 0 8px; font-weight:600;">Pick your modules</h2>
+      <p style="color:var(--fg-2); font-size:13px; margin:0;">Select the blocks you want active on your dashboard. You can change these anytime in Settings.</p>
+    </div>
+
+    {{if .Error}}
+    <div class="alert-bar critical" style="margin-bottom:16px;">
+      <span class="alert-label">Error</span>
+      <span class="alert-message">{{.Error}}</span>
+    </div>
+    {{end}}
+
+    <form method="POST" action="/onboarding/blocks">
+      <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; margin-bottom:24px;">
+        {{$defaults := .Defaults}}
+        {{range .Blocks}}
+        <label class="card" style="cursor:pointer; padding:16px;">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+            <input type="checkbox" name="blocks" value="{{.Key}}" {{if index $defaults .Key}}checked{{end}} style="accent-color:var(--blue);">
+            <span style="font-size:14px; color:var(--fg-0); font-weight:500;">{{.Name}}</span>
+          </div>
+          <p style="font-size:12px; color:var(--fg-2); margin:0; padding-left:26px;">{{.Description}}</p>
+        </label>
+        {{end}}
+      </div>
+
+      <!-- Platforms sub-step (shown when Posts is selected) -->
+      <div id="platforms-section" style="margin-bottom:24px; display:none;">
+        <h3 style="font-size:14px; color:var(--fg-0); margin:0 0 12px;">Which platforms do you post on?</h3>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--fg-1);">
+            <input type="checkbox" name="platforms" value="linkedin" checked> LinkedIn
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--fg-1);">
+            <input type="checkbox" name="platforms" value="x" checked> X (Twitter)
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--fg-1);">
+            <input type="checkbox" name="platforms" value="blog" checked> Blog
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--fg-1);">
+            <input type="checkbox" name="platforms" value="instagram"> Instagram
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--fg-1);">
+            <input type="checkbox" name="platforms" value="tiktok"> TikTok
+          </label>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between;">
+        <a href="/onboarding/role" class="btn btn-secondary">Back</a>
+        <button type="submit" class="btn btn-primary">Continue</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}

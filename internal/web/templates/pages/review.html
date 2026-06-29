@@ -1,0 +1,33 @@
+{{define "content"}}
+<div class="alert-bar info" style="margin-bottom:16px;">
+  <div class="alert-dot info"></div>
+  <span class="alert-label">Week {{.ISOWeek}}</span>
+  <span class="alert-message">Reflect on what happened this week. One review per ISO week.</span>
+</div>
+
+<form method="POST" action="/review" class="stack">
+  <div class="card" style="padding:20px;">
+    <div class="stack">
+      <div>
+        <label style="font-size:12px; color:var(--fg-2); text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:6px;">What shipped</label>
+        <textarea name="what_shipped" placeholder="Completed deliverables, deployed features, published posts..." style="min-height:80px;">{{derefStr .Review.WhatShipped}}</textarea>
+      </div>
+      <div>
+        <label style="font-size:12px; color:var(--fg-2); text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:6px;">What slipped</label>
+        <textarea name="what_slipped" placeholder="Missed deadlines, incomplete items, skipped days..." style="min-height:80px;">{{derefStr .Review.WhatSlipped}}</textarea>
+      </div>
+      <div>
+        <label style="font-size:12px; color:var(--fg-2); text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:6px;">Carry forward</label>
+        <textarea name="carry_forward" placeholder="Open items to tackle next week..." style="min-height:80px;">{{derefStr .Review.CarryForward}}</textarea>
+      </div>
+      <div>
+        <label style="font-size:12px; color:var(--fg-2); text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:6px;">One learning</label>
+        <textarea name="one_learning" placeholder="The single most useful thing you learned this week..." style="min-height:60px;">{{derefStr .Review.OneLearning}}</textarea>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex; justify-content:flex-end;">
+    <button type="submit" class="btn btn-primary">Save review</button>
+  </div>
+</form>
+{{end}}

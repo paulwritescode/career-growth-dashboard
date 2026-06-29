@@ -44,3 +44,6 @@ local-scava-bin
 *.db-wal
 *.db-shm
 scava.db*
+
+# Air live-reload temp directory
+/tmp/
