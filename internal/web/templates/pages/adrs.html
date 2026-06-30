@@ -7,7 +7,7 @@
     {{range .ADRs}}
       <tr>
         <td class="mono">ADR-{{.Number}}</td>
-        <td>{{.Title}}</td>
+        <td><a href="/adrs/{{.ID}}">{{.Title}}</a></td>
         <td><span class="tag tag-status tag-status-{{.Status}}">{{.Status}}</span></td>
         <td class="mono muted">{{if .DecidedOn}}{{derefStr .DecidedOn}}{{end}}</td>
         <td>

@@ -51,4 +51,32 @@
   <p>No todos yet. Add one above.</p>
 </div>
 {{end}}
+
+{{if .SprintChecklists}}
+<div style="margin-top:2rem">
+  <h2 style="font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">Sprint Phase Gates</h2>
+  {{range .SprintChecklists}}
+  {{$sc := .}}
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-head" style="margin-bottom:.75rem">
+      <a href="/sprints/{{$sc.Sprint.ID}}">{{$sc.Sprint.SkillName}}</a>
+      <span class="tag tag-status tag-status-{{$sc.Sprint.Status}}" style="margin-left:.5rem">{{$sc.Sprint.Status}}</span>
+    </div>
+    {{range $sc.PhaseKeys}}
+    {{$items := index $sc.ByPhase .}}
+    {{if $items}}
+    <div class="check-phase">{{.}} · {{phaseLabel .}}</div>
+    {{range $items}}
+    <form method="post" action="/checklist/{{.ID}}/toggle" class="check-row">
+      <input type="hidden" name="done" value="{{if .IsDone}}false{{else}}true{{end}}">
+      <button class="check-box {{if .IsDone}}checked{{end}}" type="submit">{{if .IsDone}}✓{{else}} {{end}}</button>
+      <span class="{{if .IsDone}}done{{end}}">{{.Label}}</span>
+    </form>
+    {{end}}
+    {{end}}
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}
 {{end}}

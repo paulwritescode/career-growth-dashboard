@@ -94,63 +94,68 @@ func (h *Handlers) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /onboarding/confirm", h.handleOnboardingConfirm)
 	mux.HandleFunc("POST /onboarding/confirm", h.handleOnboardingConfirmSubmit)
 
-	// Dashboard routes (session + onboarding complete required).
-	mux.HandleFunc("GET /{$}", h.handleOverview)
-	mux.HandleFunc("GET /sprints", h.handleSprintList)
-	mux.HandleFunc("GET /sprints/{id}", h.handleSprintDetail)
-	mux.HandleFunc("GET /cadence", h.handleCadence)
-	mux.HandleFunc("GET /posts/{id}", h.handlePostDetail)
-	mux.HandleFunc("GET /logs", h.handleLogbook)
-	mux.HandleFunc("GET /adrs", h.handleADRList)
-	mux.HandleFunc("GET /metrics", h.handleMetrics)
-	mux.HandleFunc("GET /new", h.handleNew)
-	mux.HandleFunc("GET /settings", h.handleSettings)
+	// Dashboard routes — all require an authenticated session.
+	ra := h.requireAuth
+	mux.HandleFunc("GET /{$}", ra(h.handleOverview))
+	mux.HandleFunc("GET /sprints", ra(h.blockGate("sprint", h.handleSprintList)))
+	mux.HandleFunc("GET /sprints/{id}", ra(h.handleSprintDetail))
+	mux.HandleFunc("GET /cadence", ra(h.blockGate("posts", h.handleCadence)))
+	mux.HandleFunc("GET /posts/{id}", ra(h.blockGate("posts", h.handlePostDetail)))
+	mux.HandleFunc("GET /logs", ra(h.blockGate("logs", h.handleLogbook)))
+	mux.HandleFunc("GET /adrs", ra(h.blockGate("adr", h.handleADRList)))
+	mux.HandleFunc("GET /adrs/{id}", ra(h.blockGate("adr", h.handleADRDetail)))
+	mux.HandleFunc("GET /metrics", ra(h.blockGate("metrics", h.handleMetrics)))
+	mux.HandleFunc("GET /traces", ra(h.blockGate("traces", h.handleTraces)))
+	mux.HandleFunc("GET /new", ra(h.handleNew))
+	mux.HandleFunc("GET /settings", ra(h.handleSettings))
 
 	// Block toggle.
-	mux.HandleFunc("POST /settings/blocks/{key}", h.handleBlockToggle)
+	mux.HandleFunc("POST /settings/blocks/{key}", ra(h.handleBlockToggle))
 
 	// Profile and password.
-	mux.HandleFunc("POST /settings/profile", h.handleProfileUpdate)
-	mux.HandleFunc("POST /settings/password", h.handlePasswordChange)
+	mux.HandleFunc("POST /settings/profile", ra(h.handleProfileUpdate))
+	mux.HandleFunc("POST /settings/password", ra(h.handlePasswordChange))
 
 	// Mutating form routes.
-	mux.HandleFunc("POST /sprints", h.handleSprintCreate)
-	mux.HandleFunc("POST /sprints/{id}/phase", h.handleSprintPhase)
-	mux.HandleFunc("POST /sprints/{id}/status", h.handleSprintStatus)
-	mux.HandleFunc("POST /sprints/{id}/retro", h.handleSprintRetro)
-	mux.HandleFunc("POST /sprints/{id}/delete", h.handleSprintDelete)
-	mux.HandleFunc("POST /checklist/{id}/toggle", h.handleChecklistToggle)
-	mux.HandleFunc("POST /logs", h.handleLogCreate)
-	mux.HandleFunc("POST /logs/{id}/delete", h.handleLogDelete)
-	mux.HandleFunc("POST /posts", h.handlePostCreate)
-	mux.HandleFunc("POST /posts/{id}/tier", h.handleTierUpdate)
-	mux.HandleFunc("POST /posts/{id}/delete", h.handlePostDelete)
-	mux.HandleFunc("POST /adrs", h.handleADRCreate)
-	mux.HandleFunc("POST /adrs/{id}/update", h.handleADRUpdate)
-	mux.HandleFunc("POST /adrs/{id}/delete", h.handleADRDelete)
+	mux.HandleFunc("POST /sprints", ra(h.handleSprintCreate))
+	mux.HandleFunc("POST /sprints/{id}/phase", ra(h.handleSprintPhase))
+	mux.HandleFunc("POST /sprints/{id}/status", ra(h.handleSprintStatus))
+	mux.HandleFunc("POST /sprints/{id}/retro", ra(h.handleSprintRetro))
+	mux.HandleFunc("POST /sprints/{id}/delete", ra(h.handleSprintDelete))
+	mux.HandleFunc("POST /checklist/{id}/toggle", ra(h.handleChecklistToggle))
+	mux.HandleFunc("POST /logs", ra(h.handleLogCreate))
+	mux.HandleFunc("POST /logs/{id}/delete", ra(h.handleLogDelete))
+	mux.HandleFunc("POST /posts", ra(h.handlePostCreate))
+	mux.HandleFunc("POST /posts/{id}/tier", ra(h.handleTierUpdate))
+	mux.HandleFunc("POST /posts/{id}/delete", ra(h.handlePostDelete))
+	mux.HandleFunc("POST /adrs", ra(h.handleADRCreate))
+	mux.HandleFunc("POST /adrs/{id}/update", ra(h.handleADRUpdate))
+	mux.HandleFunc("POST /adrs/{id}/delete", ra(h.handleADRDelete))
 
 	// PDF export routes.
-	mux.HandleFunc("GET /sprints/{id}/export.pdf", h.handleSprintExport)
-	mux.HandleFunc("GET /adrs/{id}/export.pdf", h.handleADRExport)
-	mux.HandleFunc("GET /logs/export.pdf", h.handleLogExport)
-	mux.HandleFunc("GET /metrics/export.pdf", h.handleMetricsExport)
+	mux.HandleFunc("GET /sprints/{id}/export.pdf", ra(h.handleSprintExport))
+	mux.HandleFunc("GET /adrs/{id}/export.pdf", ra(h.handleADRExport))
+	mux.HandleFunc("GET /logs/export.pdf", ra(h.handleLogExport))
+	mux.HandleFunc("GET /metrics/export.pdf", ra(h.handleMetricsExport))
 
-	// New block routes.
-	mux.HandleFunc("GET /todos", h.handleTodos)
-	mux.HandleFunc("POST /todos", h.handleTodoCreate)
-	mux.HandleFunc("POST /todos/{id}/status", h.handleTodoStatus)
-	mux.HandleFunc("POST /todos/{id}/delete", h.handleTodoDelete)
-	mux.HandleFunc("GET /habits", h.handleHabits)
-	mux.HandleFunc("POST /habits", h.handleHabitCreate)
-	mux.HandleFunc("POST /habits/{id}/toggle", h.handleHabitToggle)
-	mux.HandleFunc("GET /review", h.handleReview)
-	mux.HandleFunc("POST /review", h.handleReviewSave)
+	// Block-gated routes (todo, habits, review).
+	mux.HandleFunc("GET /todos", ra(h.blockGate("todo", h.handleTodos)))
+	mux.HandleFunc("POST /todos", ra(h.handleTodoCreate))
+	mux.HandleFunc("POST /todos/{id}/status", ra(h.handleTodoStatus))
+	mux.HandleFunc("POST /todos/{id}/delete", ra(h.handleTodoDelete))
+	mux.HandleFunc("GET /habits", ra(h.blockGate("habits", h.handleHabits)))
+	mux.HandleFunc("POST /habits", ra(h.handleHabitCreate))
+	mux.HandleFunc("POST /habits/{id}/toggle", ra(h.handleHabitToggle))
+	mux.HandleFunc("POST /habits/{id}/archive", ra(h.handleHabitArchive))
+	mux.HandleFunc("GET /review", ra(h.blockGate("review", h.handleReview)))
+	mux.HandleFunc("POST /review", ra(h.handleReviewSave))
 
 	// API docs.
-	mux.HandleFunc("GET /api/docs", h.handleAPIDocs)
+	mux.HandleFunc("GET /api/docs", ra(h.handleAPIDocs))
 
-	// Command palette search.
-	mux.HandleFunc("GET /api/search", h.handleSearch)
+	// Command palette search and user-info endpoint.
+	mux.HandleFunc("GET /api/search", ra(h.handleSearch))
+	mux.HandleFunc("GET /api/me", ra(h.handleAPIMe))
 
 	// REST API v1.
 	h.MountAPI(mux)

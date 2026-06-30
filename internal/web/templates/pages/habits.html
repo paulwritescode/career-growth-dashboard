@@ -4,6 +4,38 @@
   <button type="submit" class="btn btn-primary" style="padding:10px 16px;">Add habit</button>
 </form>
 
+{{if .SprintHabits}}
+<div style="margin-bottom:1.5rem">
+  <h2 style="font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.75rem">
+    Sprint habits
+    {{if .ActiveSprint}}<span class="muted" style="text-transform:none;letter-spacing:0;font-size:.8rem">— {{.ActiveSprint.SkillName}}</span>{{end}}
+  </h2>
+  <div class="stack">
+    {{range .SprintHabits}}
+    <div class="card" style="padding:14px 16px;border-left:3px solid var(--orange)">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <span style="font-size:14px; color:var(--fg-0); font-weight:500;">{{.Name}}</span>
+        <div style="display:flex; align-items:center; gap:12px;">
+          {{$streak := index $.Streaks .ID}}
+          {{if gt $streak 0}}<span style="font-size:12px; color:var(--orange); font-family:var(--mono);">{{$streak}}d streak</span>{{end}}
+          <form method="POST" action="/habits/{{.ID}}/toggle" style="margin:0;">
+            <button type="submit" class="btn-ghost" style="padding:6px 12px; font-size:12px;">Toggle today</button>
+          </form>
+        </div>
+      </div>
+      <div class="heatmap" style="grid-template-columns:repeat(30,1fr); max-width:100%;">
+        {{$entries := index $.Entries .ID}}
+        {{range $i := (seq 29 0)}}
+          {{$date := (daysAgo $i)}}
+          <span class="hcell {{if (inSlice $entries $date)}}h3{{else}}h0{{end}}" title="{{$date}}"></span>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 {{if .Habits}}
 <div class="stack">
   {{range .Habits}}

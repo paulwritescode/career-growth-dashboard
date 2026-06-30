@@ -43,6 +43,38 @@
   <span class="divider-label">Or fill in manually</span>
 </div>
 
+<div class="card" id="sprint">
+  <div class="card-head">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+    </svg>
+    New sprint
+  </div>
+  <form method="post" action="/sprints" class="stack">
+    <div class="grid grid-2">
+      <input type="text" name="month_label" placeholder="month label (e.g. 2026-07)">
+      <input type="text" name="skill_name" placeholder="skill of the month (required)" required>
+    </div>
+    <input type="text" name="skill_rationale" placeholder="why this skill / what it unlocks">
+    <input type="text" name="microapp_one_liner" placeholder="the microapp, in one sentence (required)" required>
+    <input type="text" name="core_feature" placeholder="core feature that must work (required)" required>
+    <input type="text" name="out_of_scope" placeholder="explicitly out of scope">
+    <div class="grid grid-2">
+      <select name="deploy_platform">
+        <option value="">— deploy platform —</option>
+        <option>Vercel</option><option>Netlify</option><option>Railway</option>
+        <option>Fly.io</option><option>Render</option><option>Other</option>
+      </select>
+      <div class="radio-row">
+        <span class="muted">status:</span>
+        <label><input type="radio" name="status" value="active" checked> active</label>
+        <label><input type="radio" name="status" value="planned"> planned</label>
+      </div>
+    </div>
+    <button class="btn" type="submit">start sprint</button>
+  </form>
+</div>
+
 <div class="grid grid-2">
   <div class="card" id="log">
     <div class="card-head">
@@ -92,38 +124,6 @@
       <button class="btn" type="submit">create post</button>
     </form>
   </div>
-</div>
-
-<div class="card" id="sprint">
-  <div class="card-head">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-    </svg>
-    New sprint
-  </div>
-  <form method="post" action="/sprints" class="stack">
-    <div class="grid grid-2">
-      <input type="text" name="month_label" placeholder="month label (e.g. 2026-07)">
-      <input type="text" name="skill_name" placeholder="skill of the month (required)" required>
-    </div>
-    <input type="text" name="skill_rationale" placeholder="why this skill / what it unlocks">
-    <input type="text" name="microapp_one_liner" placeholder="the microapp, in one sentence (required)" required>
-    <input type="text" name="core_feature" placeholder="core feature that must work (required)" required>
-    <input type="text" name="out_of_scope" placeholder="explicitly out of scope">
-    <div class="grid grid-2">
-      <select name="deploy_platform">
-        <option value="">— deploy platform —</option>
-        <option>Vercel</option><option>Netlify</option><option>Railway</option>
-        <option>Fly.io</option><option>Render</option><option>Other</option>
-      </select>
-      <div class="radio-row">
-        <span class="muted">status:</span>
-        <label><input type="radio" name="status" value="active" checked> active</label>
-        <label><input type="radio" name="status" value="planned"> planned</label>
-      </div>
-    </div>
-    <button class="btn" type="submit">start sprint</button>
-  </form>
 </div>
 
 <div class="card" id="adr">

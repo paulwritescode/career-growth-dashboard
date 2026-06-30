@@ -210,6 +210,20 @@ func (h *Handlers) handleBlockToggle(w http.ResponseWriter, r *http.Request) {
 
 // --- Helpers ---
 
+// requireAuth wraps a handler and redirects unauthenticated requests to /login.
+// The original URL is preserved in the ?next= query param so the login handler
+// can send the user back after a successful sign-in.
+func (h *Handlers) requireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, ok := h.currentUserID(r)
+		if !ok {
+			http.Redirect(w, r, "/login?next="+r.URL.RequestURI(), http.StatusSeeOther)
+			return
+		}
+		next(w, r)
+	}
+}
+
 func (h *Handlers) currentUserID(r *http.Request) (int64, bool) {
 	cookie, err := r.Cookie("scava_session")
 	if err != nil || cookie.Value == "" {

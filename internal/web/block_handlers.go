@@ -10,9 +10,17 @@ import (
 
 // --- Todos ---
 
+// SprintChecklist groups a sprint's phase-gate items for display on /todos.
+type SprintChecklist struct {
+	Sprint    domain.Sprint
+	ByPhase   map[domain.Phase][]domain.ChecklistItem
+	PhaseKeys []domain.Phase
+}
+
 type todosData struct {
 	pageBase
-	Todos []domain.Todo
+	Todos             []domain.Todo
+	SprintChecklists  []SprintChecklist
 }
 
 func (h *Handlers) handleTodos(w http.ResponseWriter, r *http.Request) {
@@ -21,13 +29,39 @@ func (h *Handlers) handleTodos(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
+	ctx := r.Context()
 	filter := r.URL.Query().Get("status")
-	todos, err := h.svc.Store().ListTodos(r.Context(), userID, filter)
+	todos, err := h.svc.Store().ListTodos(ctx, userID, filter)
 	if err != nil {
 		h.serverError(w, err)
 		return
 	}
-	h.render(w, "todos", todosData{pageBase: h.base("Todos", "todos"), Todos: todos})
+
+	// Load phase checklists per sprint (so users can tick them from /todos).
+	sprints, _ := h.svc.ListSprints(ctx)
+	var sprintChecklists []SprintChecklist
+	for _, sp := range sprints {
+		items, err := h.svc.Checklist(ctx, sp.ID)
+		if err != nil || len(items) == 0 {
+			continue
+		}
+		byPhase := map[domain.Phase][]domain.ChecklistItem{}
+		for _, it := range items {
+			byPhase[it.Phase] = append(byPhase[it.Phase], it)
+		}
+		phases := []domain.Phase{1, 2, 3, 4}
+		sprintChecklists = append(sprintChecklists, SprintChecklist{
+			Sprint:    sp,
+			ByPhase:   byPhase,
+			PhaseKeys: phases,
+		})
+	}
+
+	h.render(w, "todos", todosData{
+		pageBase:         h.base("Todos", "todo"),
+		Todos:            todos,
+		SprintChecklists: sprintChecklists,
+	})
 }
 
 func (h *Handlers) handleTodoCreate(w http.ResponseWriter, r *http.Request) {
@@ -103,10 +137,12 @@ func (h *Handlers) handleTodoDelete(w http.ResponseWriter, r *http.Request) {
 
 type habitsData struct {
 	pageBase
-	Habits  []domain.Habit
-	Today   string
-	Entries map[int64][]string // habitID -> list of dates with entries (last 30 days)
-	Streaks map[int64]int      // habitID -> current streak
+	Habits        []domain.Habit
+	SprintHabits  []domain.Habit // sprint-linked habits (second strip)
+	Today         string
+	Entries       map[int64][]string // habitID -> list of dates with entries (last 30 days)
+	Streaks       map[int64]int      // habitID -> current streak
+	ActiveSprint  *domain.Sprint
 }
 
 func (h *Handlers) handleHabits(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +151,8 @@ func (h *Handlers) handleHabits(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	habits, err := h.svc.Store().ListHabits(r.Context(), userID)
+	ctx := r.Context()
+	habits, err := h.svc.Store().ListHabits(ctx, userID)
 	if err != nil {
 		h.serverError(w, err)
 		return
@@ -127,18 +164,37 @@ func (h *Handlers) handleHabits(w http.ResponseWriter, r *http.Request) {
 	entries := make(map[int64][]string)
 	streaks := make(map[int64]int)
 	for _, hab := range habits {
-		e, _ := h.svc.Store().HabitEntries(r.Context(), hab.ID, from, today)
+		e, _ := h.svc.Store().HabitEntries(ctx, hab.ID, from, today)
 		entries[hab.ID] = e
-		s, _ := h.svc.Store().HabitStreak(r.Context(), hab.ID, today)
+		s, _ := h.svc.Store().HabitStreak(ctx, hab.ID, today)
 		streaks[hab.ID] = s
 	}
 
+	// Split into sprint-linked and general habits.
+	var sprintHabits []domain.Habit
+	var generalHabits []domain.Habit
+	for _, hab := range habits {
+		if hab.SprintLinked {
+			sprintHabits = append(sprintHabits, hab)
+		} else {
+			generalHabits = append(generalHabits, hab)
+		}
+	}
+
+	// Get active sprint for context.
+	var activeSprint *domain.Sprint
+	if sp, err := h.svc.CurrentSprint(ctx); err == nil {
+		activeSprint = &sp
+	}
+
 	h.render(w, "habits", habitsData{
-		pageBase: h.base("Habits", "habits"),
-		Habits:   habits,
-		Today:    today,
-		Entries:  entries,
-		Streaks:  streaks,
+		pageBase:      h.base("Habits", "habits"),
+		Habits:        generalHabits,
+		SprintHabits:  sprintHabits,
+		Today:         today,
+		Entries:       entries,
+		Streaks:       streaks,
+		ActiveSprint:  activeSprint,
 	})
 }
 
@@ -184,6 +240,16 @@ func (h *Handlers) handleHabitToggle(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, err)
 		return
 	}
+	http.Redirect(w, r, "/habits", http.StatusSeeOther)
+}
+
+func (h *Handlers) handleHabitArchive(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	_ = h.svc.Store().ArchiveHabit(r.Context(), id)
 	http.Redirect(w, r, "/habits", http.StatusSeeOther)
 }
 

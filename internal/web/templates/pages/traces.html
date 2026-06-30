@@ -1,0 +1,38 @@
+{{define "content"}}
+<div class="toolbar">
+  <span class="muted">Sprint traces — phase waterfall per sprint</span>
+</div>
+
+{{if .Sprints}}
+<div style="display:flex;flex-direction:column;gap:1.25rem;">
+  {{range .Sprints}}
+  {{$sprintID := .ID}}
+  <div class="card">
+    <div class="card-head" style="margin-bottom:.75rem">
+      <a href="/sprints/{{.ID}}" style="font-weight:600">{{.SkillName}}</a>
+      <span class="tag tag-status tag-status-{{.Status}}" style="margin-left:.5rem">{{.Status}}</span>
+      <span class="muted mono" style="margin-left:auto">{{.MonthLabel}}</span>
+    </div>
+    {{$spans := index $.Traces $sprintID}}
+    {{if $spans}}
+    <div style="margin-bottom:.5rem">{{trace $spans}}</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-top:.5rem">
+      {{range $spans}}
+      <div style="font-size:.75rem">
+        <div style="font-weight:600;color:var(--fg)">{{.Label}}</div>
+        <div class="muted">{{.DurationText}}</div>
+        <div class="muted">{{.DoneGates}}/{{.TotalGates}} gates</div>
+        {{if .IsCurrent}}<div style="color:var(--green)">● active</div>{{end}}
+      </div>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="muted" style="font-size:.85rem">No trace data yet — start progressing phases to see the waterfall.</div>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="card"><p class="muted">No sprints yet. Traces appear here as sprints move through phases.</p></div>
+{{end}}
+{{end}}

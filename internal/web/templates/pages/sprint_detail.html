@@ -1,5 +1,20 @@
 {{define "content"}}
 {{$s := .Sprint}}
+{{$eb := .EnabledBlocks}}
+
+{{if .HealthBanner.Show}}
+<div class="alert alert-{{.HealthBanner.Severity}}" style="margin-bottom:1rem">
+  {{if eq .HealthBanner.Severity "success"}}
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+  {{else if eq .HealthBanner.Severity "warning"}}
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  {{else}}
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  {{end}}
+  {{.HealthBanner.Message}}
+</div>
+{{end}}
+
 <!-- Hero: skill name + status -->
 <div class="card sprint-hero">
   <div class="sprint-head">
@@ -131,6 +146,33 @@
     <button class="btn btn-secondary" type="submit">save retro</button>
   </form>
 </div>
+
+{{if inSlice $eb "adr"}}
+<!-- Sprint ADRs (E3) -->
+<div class="card">
+  <div class="card-head" style="display:flex;align-items:center;justify-content:space-between">
+    Architecture Decisions
+    <a class="btn-ghost btn-sm" href="/new#adr">+ new ADR</a>
+  </div>
+  {{if .SprintADRs}}
+  <table class="table">
+    <thead><tr><th>#</th><th>title</th><th>status</th><th>decided</th></tr></thead>
+    <tbody>
+    {{range .SprintADRs}}
+      <tr>
+        <td class="mono">ADR-{{.Number}}</td>
+        <td><a href="/adrs/{{.ID}}">{{.Title}}</a></td>
+        <td><span class="tag tag-status tag-status-{{.Status}}">{{.Status}}</span></td>
+        <td class="mono muted">{{if .DecidedOn}}{{derefStr .DecidedOn}}{{end}}</td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">No ADRs linked to this sprint yet.</p>
+  {{end}}
+</div>
+{{end}}
 
 <!-- Danger zone -->
 <div class="card danger-zone">

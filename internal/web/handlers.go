@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/paulkinyatti/local-scava/internal/block"
 	"github.com/paulkinyatti/local-scava/internal/domain"
@@ -18,19 +19,21 @@ type SidebarItem struct {
 	Href  string
 	Icon  string // SVG path content
 	Group string // sidebar group
+	Count int    // badge count (0 = no badge)
 }
 
 // pageBase carries fields common to every page (for the layout/sidebar).
 type pageBase struct {
-	Title       string
-	Nav         string // active sidebar key
-	Today       string
-	Flash       string
-	HasActive   bool   // an active sprint exists (for the top status bar)
-	ActiveID    int64  // active sprint's ID (for linking)
-	ActiveSkill string // active sprint's skill name
-	ActivePhase int    // active sprint's current phase number
-	Sidebar     []SidebarItem // dynamic sidebar entries based on enabled blocks
+	Title         string
+	Nav           string // active sidebar key
+	Today         string
+	Flash         string
+	HasActive     bool   // an active sprint exists (for the top status bar)
+	ActiveID      int64  // active sprint's ID (for linking)
+	ActiveSkill   string // active sprint's skill name
+	ActivePhase   int    // active sprint's current phase number
+	Sidebar       []SidebarItem // dynamic sidebar entries based on enabled blocks
+	EnabledBlocks []string      // list of enabled block keys for this user
 }
 
 func (h *Handlers) base(title, nav string) pageBase {
@@ -41,59 +44,90 @@ func (h *Handlers) base(title, nav string) pageBase {
 		pb.ActiveSkill = sp.SkillName
 		pb.ActivePhase = int(sp.CurrentPhase)
 	}
-	pb.Sidebar = h.buildSidebar()
+	pb.Sidebar, pb.EnabledBlocks = h.buildSidebar()
 	return pb
 }
 
 // buildSidebar constructs the dynamic sidebar entries from enabled blocks.
-func (h *Handlers) buildSidebar() []SidebarItem {
-	// Try to get user ID from context. For the sidebar, we use user 1 (single-user app).
+// Returns the item list and a flat slice of enabled block keys.
+func (h *Handlers) buildSidebar() ([]SidebarItem, []string) {
 	userID := int64(1)
 	enabled, _ := h.block.Enabled(context.Background(), userID)
 	enabledKeys := make(map[string]bool, len(enabled))
+	var enabledSlice []string
 	for _, d := range enabled {
 		enabledKeys[d.Key] = true
+		enabledSlice = append(enabledSlice, d.Key)
 	}
 
-	var items []SidebarItem
+	// Collect per-block counts for badges.
+	counts := h.sidebarCounts(context.Background(), userID)
 
-	// Always-present items first.
+	var items []SidebarItem
 	items = append(items, SidebarItem{Key: "overview", Name: "Overview", Href: "/", Icon: "grid", Group: "Watch"})
 
-	// Block-driven items, grouped.
 	type blockNav struct {
 		key   string
 		name  string
 		href  string
 		icon  string
 		group string
-		nav   string // the Nav key for active highlight
 	}
 	allBlocks := []blockNav{
-		{"metrics", "Metrics", "/metrics", "bar-chart", "Watch", "metrics"},
-		{"traces", "Traces", "/traces", "activity", "Watch", "traces"},
-		{"habits", "Habits", "/habits", "flame", "Watch", "habits"},
-		{"sprint", "Sprints", "/sprints", "zap", "Sprints", "sprints"},
-		{"adr", "ADRs", "/adrs", "file-text", "Sprints", "adrs"},
-		{"posts", "Cadence", "/cadence", "calendar", "Cadence", "cadence"},
-		{"logs", "Logbook", "/logs", "book", "Cadence", "logbook"},
-		{"todo", "Todos", "/todos", "check-square", "Act", "todos"},
-		{"review", "Weekly Review", "/review", "clipboard", "Act", "review"},
+		{"metrics", "Metrics", "/metrics", "bar-chart", "Watch"},
+		{"traces", "Traces", "/traces", "activity", "Watch"},
+		{"habits", "Habits", "/habits", "flame", "Watch"},
+		{"sprint", "Sprints", "/sprints", "zap", "Sprints"},
+		{"adr", "ADRs", "/adrs", "file-text", "Sprints"},
+		{"posts", "Cadence", "/cadence", "calendar", "Cadence"},
+		{"logs", "Logbook", "/logs", "book", "Cadence"},
+		{"todo", "Todos", "/todos", "check-square", "Act"},
+		{"review", "Weekly Review", "/review", "clipboard", "Act"},
 	}
 
 	for _, b := range allBlocks {
 		if enabledKeys[b.key] {
-			items = append(items, SidebarItem{Key: b.nav, Name: b.name, Href: b.href, Icon: b.icon, Group: b.group})
+			items = append(items, SidebarItem{
+				Key:   b.key,
+				Name:  b.name,
+				Href:  b.href,
+				Icon:  b.icon,
+				Group: b.group,
+				Count: counts[b.key],
+			})
 		}
 	}
 
-	// Always-present: New entry, Chat, Settings.
 	items = append(items,
 		SidebarItem{Key: "new", Name: "New entry", Href: "/new", Icon: "plus-circle", Group: "Act"},
 		SidebarItem{Key: "settings", Name: "Settings", Href: "/settings", Icon: "settings", Group: "Act"},
 	)
 
-	return items
+	return items, enabledSlice
+}
+
+// sidebarCounts returns per-block record counts for sidebar badges.
+func (h *Handlers) sidebarCounts(ctx context.Context, userID int64) map[string]int {
+	db := h.svc.Store().DB()
+	counts := make(map[string]int)
+
+	var n int
+	if db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sprints`).Scan(&n) == nil && n > 0 {
+		counts["sprint"] = n
+	}
+	n = 0
+	if db.QueryRowContext(ctx, `SELECT COUNT(*) FROM adrs`).Scan(&n) == nil && n > 0 {
+		counts["adr"] = n
+	}
+	n = 0
+	if db.QueryRowContext(ctx, `SELECT COUNT(*) FROM todos WHERE user_id = ? AND status = 'open'`, userID).Scan(&n) == nil && n > 0 {
+		counts["todo"] = n
+	}
+	n = 0
+	if db.QueryRowContext(ctx, `SELECT COUNT(*) FROM habits WHERE user_id = ? AND archived = 0`, userID).Scan(&n) == nil && n > 0 {
+		counts["habits"] = n
+	}
+	return counts
 }
 
 func parseID(r *http.Request) (int64, error) {
@@ -151,17 +185,27 @@ func (h *Handlers) handleSprintList(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, err)
 		return
 	}
-	h.render(w, "sprints", sprintListData{pageBase: h.base("Sprints", "sprints"), Sprints: sprints})
+	h.render(w, "sprints", sprintListData{pageBase: h.base("Sprints", "sprint"), Sprints: sprints})
 }
 
 type sprintDetailData struct {
 	pageBase
-	Sprint    domain.Sprint
-	Checklist map[domain.Phase][]domain.ChecklistItem
-	Logs      []domain.DailyLog
-	Health    service.PhaseHealth
-	Unchecked int
-	Trace     []service.PhaseSpan
+	Sprint       domain.Sprint
+	Checklist    map[domain.Phase][]domain.ChecklistItem
+	Logs         []domain.DailyLog
+	Health       service.PhaseHealth
+	Unchecked    int
+	Trace        []service.PhaseSpan
+	ADRs         []domain.ADR   // block-gated: only if "adr" enabled
+	SprintADRs   []domain.ADR   // ADRs linked to this sprint
+	HealthBanner sprintHealthBanner
+}
+
+// sprintHealthBanner carries the computed health status for the alert bar.
+type sprintHealthBanner struct {
+	Severity string
+	Message  string
+	Show     bool
 }
 
 func (h *Handlers) handleSprintDetail(w http.ResponseWriter, r *http.Request) {
@@ -186,8 +230,14 @@ func (h *Handlers) handleSprintDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	byPhase := map[domain.Phase][]domain.ChecklistItem{}
 	unchecked := 0
+	totalItems := 0
+	doneItems := 0
 	for _, it := range items {
 		byPhase[it.Phase] = append(byPhase[it.Phase], it)
+		totalItems++
+		if it.IsDone {
+			doneItems++
+		}
 		if it.Phase == sp.CurrentPhase && !it.IsDone {
 			unchecked++
 		}
@@ -209,10 +259,109 @@ func (h *Handlers) handleSprintDetail(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, err)
 		return
 	}
+
+	// Compute health banner using checklist progress as proxy for deliverables.
+	banner := computeSprintHealthBanner(sp, totalItems, doneItems)
+
+	// Load sprint-linked ADRs if the adr block is enabled.
+	pb := h.base("Sprint · "+sp.SkillName, "sprint")
+	var sprintADRs []domain.ADR
+	for _, key := range pb.EnabledBlocks {
+		if key == "adr" {
+			allADRs, _ := h.svc.ListADRs(ctx)
+			for _, a := range allADRs {
+				if a.SprintID != nil && *a.SprintID == id {
+					sprintADRs = append(sprintADRs, a)
+				}
+			}
+			break
+		}
+	}
+
 	h.render(w, "sprint_detail", sprintDetailData{
-		pageBase: h.base("Sprint · "+sp.SkillName, "sprints"),
-		Sprint:   sp, Checklist: byPhase, Logs: logs, Health: health, Unchecked: unchecked, Trace: trace,
+		pageBase:     pb,
+		Sprint:       sp,
+		Checklist:    byPhase,
+		Logs:         logs,
+		Health:       health,
+		Unchecked:    unchecked,
+		Trace:        trace,
+		SprintADRs:   sprintADRs,
+		HealthBanner: banner,
 	})
+}
+
+// computeSprintHealthBanner returns a health banner based on sprint age and
+// checklist completion (used as a proxy for deliverables until the deliverables
+// system is fully wired to the creation form).
+func computeSprintHealthBanner(sp domain.Sprint, total, done int) sprintHealthBanner {
+	if sp.Status != domain.SprintActive {
+		return sprintHealthBanner{}
+	}
+
+	// If no dates set, fall back to a simple checklist-only message.
+	startStr := ""
+	if sp.StartsOn != nil {
+		startStr = *sp.StartsOn
+	} else if sp.StartedOn != nil {
+		startStr = *sp.StartedOn
+	}
+
+	var elapsed float64
+	if startStr != "" {
+		durationDays := 7 // default weekly sprint
+		if sp.DurationDays != nil {
+			durationDays = *sp.DurationDays
+		}
+		daysSinceStart := daysSince(startStr)
+		if durationDays > 0 {
+			elapsed = float64(daysSinceStart) / float64(durationDays)
+		}
+	}
+
+	var progress float64
+	if total > 0 {
+		progress = float64(done) / float64(total)
+	}
+
+	switch {
+	case elapsed > 1.0 && progress < 1.0:
+		return sprintHealthBanner{
+			Severity: "critical",
+			Message:  "Sprint overdue — mark complete or extend before starting a new one.",
+			Show:     true,
+		}
+	case elapsed >= 0.8 && progress < 0.5:
+		return sprintHealthBanner{
+			Severity: "critical",
+			Message:  "Sprint ending soon · " + strconv.Itoa(total-done) + " checklist items still incomplete.",
+			Show:     true,
+		}
+	case elapsed >= 0.5 && progress < 0.25:
+		return sprintHealthBanner{
+			Severity: "warning",
+			Message:  "Sprint halfway through — only " + strconv.Itoa(int(progress*100)) + "% of checklist complete. Pick up the pace.",
+			Show:     true,
+		}
+	default:
+		if total > 0 {
+			return sprintHealthBanner{
+				Severity: "success",
+				Message:  "On track · " + strconv.Itoa(done) + "/" + strconv.Itoa(total) + " checklist items complete.",
+				Show:     true,
+			}
+		}
+		return sprintHealthBanner{}
+	}
+}
+
+// daysSince returns days elapsed since a YYYY-MM-DD date string.
+func daysSince(dateStr string) int {
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return 0
+	}
+	return int(time.Since(t).Hours() / 24)
 }
 
 // --- Cadence --------------------------------------------------------------
@@ -242,7 +391,7 @@ func (h *Handlers) handleCadence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.render(w, "cadence", cadenceData{
-		pageBase: h.base("Cadence", "cadence"),
+		pageBase: h.base("Cadence", "posts"),
 		Heatmap:  cells, Posts: posts, Rate: rate,
 	})
 }
@@ -275,7 +424,7 @@ func (h *Handlers) handlePostDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := postDetailData{
-		pageBase: h.base("Post · "+post.PostDate, "cadence"), Post: post, ADRs: adrs,
+		pageBase: h.base("Post · "+post.PostDate, "posts"), Post: post, ADRs: adrs,
 	}
 	// Sunday recaps draw from the week's daily logs (spec 05): surface them as
 	// raw material for drafting.
@@ -310,7 +459,7 @@ func (h *Handlers) handleLogbook(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, err)
 		return
 	}
-	h.render(w, "logbook", logbookData{pageBase: h.base("Logbook", "logbook"), Events: events, Logs: logs})
+	h.render(w, "logbook", logbookData{pageBase: h.base("Logbook", "logs"), Events: events, Logs: logs})
 }
 
 // --- ADRs -----------------------------------------------------------------
@@ -326,7 +475,32 @@ func (h *Handlers) handleADRList(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, err)
 		return
 	}
-	h.render(w, "adrs", adrListData{pageBase: h.base("ADRs", "adrs"), ADRs: adrs})
+	h.render(w, "adrs", adrListData{pageBase: h.base("Architecture Decision Records", "adr"), ADRs: adrs})
+}
+
+// adrDetailData carries the single-ADR view data.
+type adrDetailData struct {
+	pageBase
+	ADR domain.ADR
+}
+
+func (h *Handlers) handleADRDetail(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := parseID(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	adr, err := h.svc.Store().GetADR(ctx, id)
+	if errors.Is(err, service.ErrNotFound) {
+		http.NotFound(w, r)
+		return
+	} else if err != nil {
+		h.serverError(w, err)
+		return
+	}
+	title := "ADR-" + strconv.Itoa(adr.Number) + ": " + adr.Title
+	h.render(w, "adr_detail", adrDetailData{pageBase: h.base(title, "adr"), ADR: adr})
 }
 
 // --- Metrics --------------------------------------------------------------
@@ -477,3 +651,96 @@ func (h *Handlers) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 	h.render(w, "settings", data)
 }
+
+// --- Traces ---------------------------------------------------------------
+
+type tracesData struct {
+	pageBase
+	Sprints []domain.Sprint
+	Traces  map[int64][]service.PhaseSpan // sprintID -> spans
+}
+
+func (h *Handlers) handleTraces(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	sprints, err := h.svc.ListSprints(ctx)
+	if err != nil {
+		h.serverError(w, err)
+		return
+	}
+	traces := make(map[int64][]service.PhaseSpan)
+	for _, sp := range sprints {
+		spans, err := h.svc.SprintTrace(ctx, sp.ID)
+		if err == nil {
+			traces[sp.ID] = spans
+		}
+	}
+	h.render(w, "traces", tracesData{
+		pageBase: h.base("Traces", "traces"),
+		Sprints:  sprints,
+		Traces:   traces,
+	})
+}
+
+// --- API: /api/me (localStorage hydration) --------------------------------
+
+func (h *Handlers) handleAPIMe(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.currentUserID(r)
+	if !ok {
+		apiJSON(w, http.StatusUnauthorized, map[string]any{"error": "not authenticated"})
+		return
+	}
+	user, err := h.auth.GetUser(r.Context(), userID)
+	if err != nil {
+		apiJSON(w, http.StatusInternalServerError, map[string]any{"error": "user not found"})
+		return
+	}
+	enabledDefs, _ := h.block.Enabled(r.Context(), userID)
+	keys := make([]string, 0, len(enabledDefs))
+	for _, d := range enabledDefs {
+		keys = append(keys, d.Key)
+	}
+	apiJSON(w, http.StatusOK, map[string]any{
+		"username":       user.Username,
+		"displayName":    user.DisplayName,
+		"avatarInitials": user.AvatarInitials,
+		"role":           string(user.Role),
+		"enabledBlocks":  keys,
+	})
+}
+
+// --- Block-disabled page --------------------------------------------------
+
+func (h *Handlers) handleBlockDisabled(w http.ResponseWriter, blockKey string) {
+	def, ok := block.ByKey(blockKey)
+	name := blockKey
+	if ok {
+		name = def.Name
+	}
+	w.WriteHeader(http.StatusNotFound)
+	h.render(w, "block_disabled", struct {
+		pageBase
+		BlockName string
+		BlockKey  string
+	}{
+		pageBase:  h.base("Block disabled", ""),
+		BlockName: name,
+		BlockKey:  blockKey,
+	})
+}
+
+// blockGate returns a handler that checks whether the named block is enabled
+// before invoking next. If disabled it renders the block-disabled page.
+func (h *Handlers) blockGate(blockKey string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, _ := h.currentUserID(r)
+		enabled, err := h.block.IsEnabled(r.Context(), userID, blockKey)
+		if err != nil || !enabled {
+			h.handleBlockDisabled(w, blockKey)
+			return
+		}
+		next(w, r)
+	}
+}
+
+// ensure time is used (daysSince already references it)
+var _ = time.Now

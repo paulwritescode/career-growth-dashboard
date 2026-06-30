@@ -1,0 +1,551 @@
+#+TITLE: local-scava — Refinement Plan (Phase 3 polish + sprint-as-mother)
+#+AUTHOR: paul kinyatti
+#+DATE: 2026-06-30
+#+STARTUP: overview
+#+TODO: TODO IN-PROGRESS BLOCKED | DONE
+
+# ============================================================================
+# HOW TO USE THIS FILE
+# ----------------------------------------------------------------------------
+# This is the single source of truth for the current refinement pass. It is a
+# SPEC / PROMPT document — nothing here is implemented yet. Feed an epic (or a
+# single task) back to the agent as the implementation prompt. A mirror of this
+# file exists as REFINEMENT-PLAN.lisp (same content, s-expression form).
+#
+# Each task carries: WHY, CURRENT (what the code does today), TARGET (desired
+# behaviour), FILES (where to work), and ACCEPTANCE (done-when checks).
+# Verify every file path before editing — paths reflect the repo at 2026-06-30.
+# ============================================================================
+
+* CONTEXT / GROUND TRUTH
+:PROPERTIES:
+:stack: Go 1.25, libSQL (cgo), html/template + htmx, goose migrations, embed.FS single binary
+:ui: Grafana-style dark dashboard, server-rendered, loopback-only (127.0.0.1:3000)
+:END:
+
+** Architecture (leaf → outward)
+- =internal/domain= — entities + enums, no SQL/HTTP. (entities.go, enums.go)
+- =internal/store= — libSQL queries + goose migrations (0001..0009).
+- =internal/service= — business rules (sprint health, cadence, metrics, traces).
+- =internal/block= — block registry + per-user enable/disable (registry.go, service.go).
+- =internal/auth= — login, sessions, API keys, middleware.
+- =internal/onboarding= — 3-step wizard (role → blocks → confirm).
+- =internal/bridge= — WebSocket ↔ kiro-cli chat proxy.
+- =internal/export= — server-side PDF (fpdf).
+- =internal/web= — handlers, html/template pages, static CSS/JS, REST API v1.
+
+** Block registry (the "KYC blocks") — internal/block/registry.go
+Keys + groups + default-on:
+- sprint   (Sprints, on)   routes /sprints, /sprints/
+- adr      (Sprints, off)  routes /adrs, /adrs/
+- logs     (Cadence, on)   routes /logs
+- posts    (Cadence, off)  routes /cadence, /posts/
+- todo     (Act, off)      routes /todos
+- traces   (Watch, off)    routes /traces
+- metrics  (Watch, on)     routes /metrics
+- habits   (Watch, off)    routes /habits
+- review   (Act, off)      routes /review
+
+=block.Service.SetBlocks= already disables every registry key NOT in the
+selected list (onboarding writes a row per key). =IsRouteEnabled= exists but
+must be confirmed as wired into request gating (see EPIC C).
+
+** Design tokens — internal/web/static/app.css
+- Radii scale is intentionally flat (=--r-xs..--r-xxl:2px=) EXCEPT =--r-pill:9999px=.
+- =.btn= is already pill (=border-radius:var(--r-pill)=); =.btn-primary= = blue.
+- =.card= has =border:1px solid var(--line)= + soft shadow — this is the border
+  the sign-in page must drop.
+- Alert system: =.alert-bar= variants =success|warning|critical|info=, with
+  =critical overdue= adding a pulsing dot (=.alert-dot.pulse=). Use these for
+  sprint reminders (EPIC E).
+- Semantic colors: green=healthy, yellow/orange=watch, red=act.
+
+** Severity enum already exists — internal/domain/enums.go
+=success | warning | alert | alarm | nudge=. Map to alert-bar variants per
+phase2/04-sprint-rules.md.
+
+* EPIC A — Sign-in page (borderless, pill, localStorage)  :auth:
+** TODO A1 — Borderless sign-in card, pill buttons
+WHY: User wants a cleaner, borderless sign-in using the pill button style.
+CURRENT: =internal/web/templates/pages/login.html= renders a =.card= (which has
+a 1px line border + shadow) wrapping the form; inputs use the default 1px border;
+button is =.btn .btn-primary= (already pill).
+TARGET:
+- Drop the card border + shadow on the sign-in container (flat, borderless —
+  either remove =.card= class or add a =.card-borderless= modifier with
+  =border:none; box-shadow:none; background:transparent=).
+- Inputs: borderless / underline-only treatment consistent with a clean auth
+  screen (keep focus affordance via background or bottom-border).
+- All actionable buttons use the pill style (=.btn= already is pill; ensure the
+  "Sign in" CTA and any secondary links use pill geometry, full-width primary).
+- Keep the centered, max-width 400px layout.
+FILES: internal/web/templates/pages/login.html; add modifier classes in
+internal/web/static/app.css if needed.
+ACCEPTANCE:
+- Sign-in screen shows no visible card border/box outline.
+- Primary CTA is a full-width pill; secondary actions are pills/links.
+- Visual parity preserved on the chromeless layout (login uses chromeless).
+
+** TODO A2 — Persist user details to browser localStorage on sign-in
+WHY: "when user signs in, just store the details in local storage of the browser."
+CURRENT: auth is server-side cookie session only (=internal/auth=, POST /login →
+=handleLoginSubmit=). Nothing is written to localStorage.
+TARGET:
+- On successful login, persist a small JSON blob to =localStorage= under a stable
+  key (e.g. =scava-user=): { username, displayName, role, avatarInitials,
+  enabledBlocks:[...] }. enabledBlocks lets the client tailor UI (chat actions,
+  new-entry actions) without a round-trip.
+- Implementation options (pick one, document choice):
+  a) Server injects a tiny =<script>= on the post-login redirect target that
+     writes the blob (data sourced from the authenticated user + block service).
+  b) A =GET /api/me= JSON endpoint the client calls once after login and caches.
+- Clear =scava-user= on logout (POST /logout).
+FILES: internal/web/auth_handlers.go, internal/web/templates/layout.html (or a
+new /api/me handler in internal/web/api.go), internal/block/service.go (enabled
+keys), internal/web/static/* for the writer script.
+ACCEPTANCE:
+- After login, =localStorage.getItem('scava-user')= returns the JSON blob with
+  enabledBlocks matching the user's KYC selection.
+- After logout the key is removed.
+- This is additive; cookie session remains the source of truth for auth.
+
+* EPIC B — KYC / Onboarding look & feel  :onboarding:
+** TODO B1 — Improve onboarding visual design
+WHY: "the KYC ... needs to be improved the way it looks and feels."
+CURRENT: =onboarding_role.html=, =onboarding_blocks.html=, =onboarding_confirm.html=
+use mostly inline styles; blocks step is a 2-col checkbox grid with a hidden
+platforms sub-step.
+TARGET:
+- Promote the three steps into a cohesive wizard: consistent step indicator,
+  card-based selectable blocks with icon + name + description, pill CTAs,
+  clear selected/unselected states (selected = orange left accent / filled).
+- Make block cards visibly toggle (checkbox drives an aria-checked styled card,
+  not a bare checkbox).
+- Keep it chromeless; align spacing to the 4px grid + design tokens.
+FILES: internal/web/templates/pages/onboarding_role.html,
+onboarding_blocks.html, onboarding_confirm.html; app.css additions.
+ACCEPTANCE: wizard reads as a designed flow (not raw inline styles), selectable
+cards have an obvious selected state, CTAs are pills.
+
+* EPIC C — Strict block selection + gating  :blocks:critical:
+** TODO C1 — Confirm matrix is honored: never show unselected blocks
+WHY: "be really strict ... when I select one of the blocks, do not give me
+blocks that I did not select." "the blocks that I selected are the ones that will
+be shown in the website."
+CURRENT: =SetBlocks= disables every non-selected key (good). =buildSidebar=
+(handlers.go) already filters by =enabledKeys=. Confirm overview/new/chat/palette
+also only surface enabled blocks.
+TARGET:
+- Sidebar: only enabled blocks appear (verify; already implemented).
+- Overview (=/=): cards/sections for a block render ONLY if that block is enabled.
+- Command palette + chat quick-actions + /new actions: enabled blocks only
+  (see EPIC O and EPIC P).
+- Onboarding confirm screen: shows exactly the selected set, nothing else.
+FILES: internal/web/handlers.go (buildSidebar, overview), overview.html,
+new.html, layout.html (chat), palette.js.
+ACCEPTANCE: with only {sprint, logs, metrics} selected, no ADR/posts/todo/habits/
+review/traces UI appears anywhere (sidebar, overview, /new, chat, palette).
+
+** TODO C2 — Disabled block routes return a proper error page
+WHY: "the others will show an error."
+CURRENT: =block.Service.IsRouteEnabled(path)= returns (key, enabled, err) but it
+is NOT visibly wired as middleware around the dashboard routes in web.go/Mount.
+Hitting =/adrs= when adr is disabled currently still renders.
+TARGET:
+- Add a gating layer: for every block-owned route, if the owning block is
+  disabled for the user, respond with a dedicated "block disabled" page
+  (HTTP 403 or 404 — pick + document) that explains the block is off and links
+  to Settings → Blocks to enable it. Non-block routes pass through.
+- Wrap dashboard handlers (or add a mux middleware) using IsRouteEnabled.
+FILES: internal/web/web.go (Mount/middleware), internal/block/service.go
+(IsRouteEnabled — already present), a new template
+internal/web/templates/pages/block_disabled.html.
+ACCEPTANCE: visiting a disabled block's route shows the error page, not the
+feature; enabled routes are unaffected.
+
+* EPIC D — Sidebar count badges  :sidebar:
+** TODO D1 — Cart-style count badges on sidebar icons
+WHY: "show a number on top of the sprint to show how many sprints are there
+(not beside it but on top of it, the way we ... have a cart icon)."
+CURRENT: =block.Service.Metrics()= returns human strings ("3 sprints · 1 active",
+"14 ADRs", etc.) used on the Settings cards. Sidebar (=buildSidebar=) renders
+plain nav items with no badge.
+TARGET:
+- Compute per-block counts (sprints, adrs, logs, posts, todos open, habits) and
+  attach a numeric badge positioned at the top-right corner of each sidebar item
+  icon (absolute-positioned superscript badge, like a cart count).
+- Badge only shows when count > 0. Style: small pill, orange/accent, on top of
+  the icon glyph (not inline text).
+FILES: internal/web/handlers.go (SidebarItem gains Count int; buildSidebar fills
+it from block.Service counts), internal/web/templates/layout.html (badge markup),
+internal/web/static/app.css (=.nav-badge= absolute positioning).
+ACCEPTANCE: with 3 sprints, the Sprints sidebar icon shows a "3" badge at its
+top-right corner; zero-count blocks show no badge.
+
+* EPIC E — Sprint rules, dates, reminders  :sprint:core:
+** TODO E1 — Many sprints, one RUNNING sprint per ISO week
+WHY: "we can create more than one sprints, but we can only have one running
+sprint per week."
+CURRENT: migration 0005 adds =ux_sprints_single_active= (one active sprint
+globally). phase2/04-sprint-rules.md documents single-active enforcement +
+ErrActiveSprintExists. There is no week-scoped rule yet.
+TARGET:
+- Allow creating unlimited sprints (draft/planned).
+- Enforce: at most ONE sprint in =active= ("running") state whose week (ISO week
+  of starts_on / now) collides with another active sprint. Concretely: starting
+  a sprint is rejected if another sprint is already active in the same ISO week.
+- Decide relationship to the existing global single-active index: either keep
+  global single-active (simplest, "one running at a time") OR relax to
+  per-week. DOCUMENT the chosen semantics in code + this file.
+- New/extended sentinel error: =ErrActiveSprintThisWeek= with inline copy:
+  "You already have a running sprint this week. Finish or archive it before
+  starting another."
+FILES: internal/service/sprint.go (Start/Create checks), internal/store/sprints.go,
+internal/store/migrations/ (new migration if index changes), domain enums for the
+error path.
+ACCEPTANCE: can create N sprints; starting a 2nd active sprint in the same ISO
+week is rejected with the inline error; a sprint in a different week can start.
+
+** TODO E2 — Sprint dates/times, progress checks, reminders with alert colors
+WHY: "have dates and times that check the progress we are making and give
+reminders or notification with the different alert colors we have in the system."
+CURRENT: Sprint has =StartsOn=, =EndsOn=, =DurationDays= (3/5/7/14). Health is
+computed on page load in handleSprintDetail using only the per-phase checklist
+gut-check (unchecked > 2 → red). The richer time-vs-deliverables health from
+phase2/04 (SprintHealth{Severity,...}) is specified but the banner is not wired.
+TARGET:
+- Implement the computed =SprintHealth= (Severity, ElapsedPct, DeliverablesPct,
+  DaysRemaining, IncompleteCount, Message) using starts_on→ends_on vs
+  deliverables-done, per phase2/04-sprint-rules.md thresholds:
+  - ≥50% time, <25% deliverables → warning
+  - ≥80% time, <50% deliverables → alert (at risk)
+  - deadline passed + incomplete → alarm (overdue, pulsing dot)
+  - no active sprint & last ended >7d → nudge
+  - else → success
+- Render a health =.alert-bar= at the top of /sprints/{id} AND a sprint-health
+  card on Overview, using the system alert colors (success/warning/critical/
+  info; overdue pulses).
+- "Reminders/notifications": surface these computed banners on Overview + sprint
+  page (computed on read, no background worker — consistent with local-first).
+  Optionally also feed a count into the sidebar badge / topbar.
+FILES: internal/service/sprint.go (Health method), domain.SprintHealth (exists),
+internal/web/handlers.go (handleSprintDetail, handleOverview), sprint_detail.html,
+overview.html, app.css alert variants (exist).
+ACCEPTANCE: a sprint past 80% time with <50% deliverables shows the red "at risk"
+alert with the right copy on both the sprint page and Overview; overdue pulses.
+
+** TODO E3 — Sprint is the mother: ADR/posts/logs/traces nested under a sprint
+WHY: "a sprint is the mother of many ... a sprint has adr, posts, logs traces —
+they will be there if we included them during the kyc blocks selection."
+CURRENT: DailyLog, Post, ADR, TraceSpan all carry optional =SprintID=. Sprint
+detail page shows checklist + daily logs + retro only. No ADR/posts/traces
+sections on the sprint page; nothing is gated by enabled blocks there.
+TARGET:
+- On /sprints/{id}, render child sections for each ENABLED block only:
+  - logs   → daily logs stream (exists) — keep.
+  - adr    → ADRs linked to this sprint (list + create-linked).
+  - posts  → posts linked to this sprint (list + generate, see EPIC F3).
+  - traces → the sprint trace waterfall (exists as "Sprint Trace") — keep,
+    ensure it's gated by traces block.
+  - todo   → this sprint's phase checklist (see EPIC L2) + linked todos.
+- If a block is disabled in KYC, its section does NOT appear on the sprint page.
+FILES: internal/web/handlers.go (handleSprintDetail loads children + enabled
+set), internal/service/* (ListADRsBySprint, ListPostsBySprint already partially
+exist — verify), sprint_detail.html (conditional child sections).
+ACCEPTANCE: a sprint shows exactly the child sections for the blocks selected in
+KYC; disabling a block removes its section from the sprint page.
+
+* EPIC F — Sprint cadence: daily entries + generated post  :sprint:posts:
+** TODO F1 — Reframe sprint = weekly; logs/retro/adr = daily
+WHY: "the sprint is weekly; the logs, retro, adr should be daily."
+CURRENT: Sprint duration is 3/5/7/14 days. DailyLog is per-day already. Retro is
+a single per-sprint block (RetroWorked/Differently/Learned/LiveLink). ADRs are
+per-sprint but undated-by-day.
+TARGET:
+- Treat the sprint as the weekly container; within it, present a per-DAY entry
+  surface: each day has its log, its retro note, and any ADRs decided that day.
+- Add a daily retro concept (either a dated retro note per day, or reuse
+  DailyLog fields) — DOCUMENT the data choice. Minimal path: a "daily entry"
+  view that groups by date the day's log(s), retro note, and ADRs.
+FILES: internal/domain/entities.go (possibly a DailyEntry view model or a dated
+retro), internal/store/*, internal/service/sprint.go, sprint_detail.html.
+ACCEPTANCE: sprint page shows day-grouped entries (log + retro + adr) per day.
+
+** TODO F2 — Show yesterday / last-2-days entries
+WHY: "we need to figure out a way to display the details of yesterday's details
+or the last 2 days."
+CURRENT: handleSprintDetail loads all logs for the sprint; no day-windowed view.
+TARGET:
+- On the sprint page, add a "Recent" panel showing yesterday's and the prior
+  day's combined daily entries (log + retro + adr) for quick continuity.
+FILES: internal/service/sprint.go (RecentDailyEntries(sprintID, days)),
+handlers.go, sprint_detail.html.
+ACCEPTANCE: panel shows the last 2 days' entries; empty-state when none.
+
+** TODO F3 — "Generate today's post" from the day's entries via kiro-cli
+WHY: "it will read the daily entry of the present blocks for the sprint on that
+day (logs, retro, adr) ... button 'generate today's post' ... use kiro-cli to
+generate this LinkedIn post ... save that post, and display the post too."
+CURRENT: Posts exist with tiers; bridge.go proxies kiro-cli over WebSocket; the
+post detail page surfaces week material for recaps. No "generate" action exists.
+TARGET:
+- Add a "Generate today's post" button on the sprint's daily surface. On click:
+  1. Gather today's present-block entries for the sprint (logs + retro + adr),
+     only for blocks enabled in KYC.
+  2. Send a structured prompt to kiro-cli (via bridge) asking for a LinkedIn-tier
+     post drafted from those entries.
+  3. Persist the result as a Post (+ linkedin PostTier, status drafted) linked to
+     the sprint and source log.
+  4. Render the generated post inline (and link to its detail page).
+- Decide sync vs async (WebSocket streaming vs a request/response endpoint) and
+  DOCUMENT it. Gate the whole feature on the =posts= block being enabled.
+FILES: internal/bridge/bridge.go (or a service method that calls kiro-cli),
+internal/service/content.go (CreatePost), internal/store/posts.go, a new handler
+(POST /sprints/{id}/generate-post or /posts/generate), sprint_detail.html +
+post_detail.html.
+ACCEPTANCE: with posts enabled and a day's entries present, clicking Generate
+produces a saved LinkedIn post draft built from that day's log/retro/adr and
+displays it; disabled posts block hides the button.
+
+* EPIC G — ADRs: title, detail page, PDF  :adr:
+** TODO G1 — Full title on ADR list page
+WHY: "in the adrs page give it the full name at the top (the title; don't just
+say adr but say architecture decision record)."
+CURRENT: handleADRList sets page title "ADRs"; adrs.html header likely says "ADRs".
+TARGET: page heading reads "Architecture Decision Records" (full name); keep
+"ADR" only as a compact tag/abbreviation where space-constrained.
+FILES: internal/web/handlers.go (handleADRList title), adrs.html.
+ACCEPTANCE: /adrs H1 reads "Architecture Decision Records".
+
+** TODO G2 — ADR detail page rendered like a document (markdown/PDF feel)
+WHY: "when I select an adr, take me to a page that shows the details of that adr
+(render it like it's in a page — like a pdf or markdown editor — the best one you
+can find). On this page we will have the option for export pdf."
+CURRENT: Routes exist for POST /adrs/{id}/update, /delete, and GET
+/adrs/{id}/export.pdf, but there is NO =GET /adrs/{id}= detail page route or
+template. The list is the only ADR view.
+TARGET:
+- Add =GET /adrs/{id}= → a document-style detail page that renders the ADR
+  (Number, Title, Status, DecidedOn, Problem, Options, Decision, Why,
+  Consequences) as a clean, readable "paper" layout (markdown-rendered body,
+  generous typography, max-width column — the "best markdown render" we can do
+  with the existing stack; a lightweight client-side markdown renderer is
+  acceptable, no new heavy deps).
+- Place an "Export PDF" button on this page wired to the existing
+  =GET /adrs/{id}/export.pdf=.
+- Make ADR rows on the list link to this detail page.
+FILES: internal/web/web.go (register GET /adrs/{id}), handlers.go
+(handleADRDetail), new template internal/web/templates/pages/adr_detail.html,
+adrs.html (link rows), optional small markdown JS in static/.
+ACCEPTANCE: clicking an ADR opens a document-style page; Export PDF downloads the
+existing server-generated PDF.
+
+* EPIC H — Posts / cadence page  :posts:
+** TODO H1 — /cadence displays correctly
+WHY: "make sure the http://localhost:3000/cadence works as it should — it
+displays information as it should."
+CURRENT: handleCadence loads heatmap + posts + 30d rate into cadence.html.
+TARGET: verify heatmap renders (90d), posts list renders with tier status, rate
+shows; fix any empty/broken rendering; ensure gated by =posts= block.
+FILES: handlers.go (handleCadence), cadence.html, internal/service/content.go.
+ACCEPTANCE: /cadence shows a populated heatmap + posts list + cadence rate with
+no template errors.
+
+* EPIC I — Logbook  :logs:
+** TODO I1 — Logbook displays information nicely
+WHY: "even the logbook display information there nicely."
+CURRENT: handleLogbook loads 200 events + 200 logs into logbook.html.
+TARGET: present career events (audit trail) and daily logs as clean, scannable
+SRE-style log streams (timestamp mono, kind tag, summary); fix density/empty
+states; gated by =logs= block.
+FILES: handlers.go (handleLogbook), logbook.html.
+ACCEPTANCE: /logs shows a tidy two-stream (events + daily logs) view.
+
+* EPIC J — Traces  :traces:
+** TODO J1 — Traces page works
+WHY: "make sure the traces page works."
+CURRENT: traces block declares route =/traces= and API =/api/v1/traces=, but
+web.go Mount has NO =GET /traces= handler registered (only /sprints/{id} renders
+a Sprint Trace inline). The sidebar links to /traces → likely 404.
+TARGET:
+- Register =GET /traces= with a handler rendering a traces page: the sprint(s)
+  as phase-waterfall spans (reuse =sprintTraceSVG= / service.SprintTrace) and any
+  API-pushed TraceSpans. Add a traces.html page template.
+- Gate on the =traces= block.
+FILES: internal/web/web.go (route), handlers.go (handleTraces), new
+internal/web/templates/pages/traces.html, internal/service/traces.go.
+ACCEPTANCE: /traces renders without 404 and shows the waterfall(s).
+
+* EPIC K — Metrics (Grafana-style)  :metrics:
+** TODO K1 — All charts/graphs working; SRE/Grafana feel
+WHY: "the metrics — make sure all the charts and graphs are working. This is to
+look and feel like grafana, with sre features."
+CURRENT: handleMetrics wires many series (cadence 7/30/90, streaks, ship rate,
+tier mix, tier goals, daily post/log counts, sprint uptime, content stats, recent
+activity) into metrics.html via SVG helpers (sparkline, barGauge, areaChart,
+uptime, progressRing, tierDonut, activityFeed).
+TARGET: audit every panel renders with real data (no blank SVGs / divide-by-zero),
+ensure Grafana-style layout (stat panels, time-series area charts, bar gauges,
+uptime strip), fix any broken helper output. Add SRE touches (uptime %, error/at-
+risk indicators) consistent with the alert color system.
+FILES: internal/web/charts.go (SVG helpers), handlers.go (handleMetrics),
+metrics.html, internal/service/metrics.go.
+ACCEPTANCE: every metrics panel shows correct data; no empty/broken charts;
+layout reads like a Grafana board.
+
+* EPIC L — Todos + phase checklist sync  :todo:
+** TODO L1 — Todos selectable in KYC + clean CRUD page
+WHY: "the todos should also be fixed nicely (all the way from the kyc — I can
+select it)."
+CURRENT: =todo= block is in the registry (selectable in onboarding). Routes:
+GET /todos, POST /todos, POST /todos/{id}/status, /delete. todos.html exists.
+TARGET: verify the todo block is selectable in onboarding and that /todos offers
+clean CRUD (create with priority/due/sprint-link, toggle status, delete);
+polish layout; gate on =todo= block.
+FILES: onboarding_blocks.html, handlers.go (todo handlers), todos.html,
+internal/store/todos.go.
+ACCEPTANCE: todo block toggles on in KYC; /todos supports full CRUD cleanly.
+
+** TODO L2 — Phase checklists on the todo page, grouped by sprint, two-way synced
+WHY: "when we create a sprint it has the phase checklist ... let's have them on
+the todo page and grouped according to the sprint they are on. When I check it
+from either the todo page or the phase checklist from the sprint page it should
+update that I have done it (completed)."
+CURRENT: =ChecklistItem= (per sprint, per phase) is seeded per sprint and toggled
+via =POST /checklist/{id}/toggle= (shared). Sprint detail renders the checklist
+grouped by phase. The todo page does NOT show phase checklists.
+TARGET:
+- On /todos, render each sprint's phase checklist as a grouped section
+  (group header = sprint title/skill; sub-groups = phases), alongside regular
+  todos.
+- Reuse the SAME =POST /checklist/{id}/toggle= action so toggling from either the
+  todo page or the sprint page updates the one underlying ChecklistItem (single
+  source of truth → both views reflect completion).
+FILES: handlers.go (handleTodos loads checklists per sprint), todos.html (render
+grouped checklists + reuse toggle form), internal/service/sprint.go (Checklist
+queries — exist).
+ACCEPTANCE: checking an item on /todos marks it done on the sprint page and vice
+versa; checklists are grouped by sprint on the todo page.
+
+* EPIC M — Habits (sprint strip)  :habits:
+** TODO M1 — Second habit strip scoped to the sprint
+WHY: "the habits should also have a second strip where it shows my habits when it
+comes to the sprint."
+CURRENT: =Habit= has =SprintLinked bool=. /habits renders a heatmap + streaks.
+phase2/08 says linked habits surface on sprint detail as a streak indicator.
+TARGET:
+- On /habits, render TWO strips: (1) all daily habits (existing), and (2) a
+  second strip filtered to =SprintLinked= habits ("sprint habits") tied to the
+  active sprint, showing their streak/heatmap in sprint context.
+- Also surface sprint-linked habit streaks on the sprint detail page.
+FILES: handlers.go (handleHabits), habits.html, sprint_detail.html,
+internal/store/habits.go (filter by sprint_linked), internal/service/* .
+ACCEPTANCE: /habits shows a general strip and a separate sprint-habit strip;
+sprint page shows linked-habit streaks.
+
+* EPIC N — Settings (admin details + password)  :settings:
+** TODO N1 — Settings shows admin profile + password change
+WHY: "fix the setting page to show the details of the admin, the password if I
+want to change them."
+CURRENT: handleSettings loads =data.User= (display name, username, role, initials)
+and block cards with metrics; POST /settings/profile and POST /settings/password
+routes exist. Need to confirm settings.html actually renders the profile + a
+working password-change form.
+TARGET:
+- Settings shows the admin's details (username, display name, role, avatar
+  initials) editable via the profile form, plus a password-change form (current +
+  new + confirm) wired to POST /settings/password.
+- Keep the blocks-toggle section + daemon info (Meta) sections.
+- Polish layout per design system.
+FILES: settings.html, handlers.go (handleSettings, handleProfileUpdate,
+handlePasswordChange — verify error/success messaging via ?msg/?err).
+ACCEPTANCE: admin can see/edit profile and change password from /settings with
+success/error feedback.
+
+* EPIC O — Chat (kiro-cli) copy + block-aware  :chat:
+** TODO O1 — Chat welcome + connection + sprint prompt copy
+WHY: User specified the exact chat experience:
+  - "Hey! I'm your build assistant. What are you working on today?"
+  - subtitle/system: "connected to kiro-cli — ask me to log today, start a
+    sprint, or draft a post"
+  - kiro-cli sprint prompt: "Tell me more about the sprint you want to create —
+    what skill do you want to learn this month, and what will you build to prove
+    it?"
+CURRENT: layout.html chat widget welcome = "Hey! I'm your build assistant. What
+are you working on today?" (matches). No "connected to kiro-cli — ..." line; no
+seeded sprint-creation prompt.
+TARGET:
+- Add the "connected to kiro-cli — ask me to log today, start a sprint, or draft
+  a post" line as the system/connection status line under the header (shown on
+  WS connect; the =onopen= handler can append it as a system message).
+- When the user intent is "create a sprint", kiro-cli responds with the exact
+  sprint prompt copy above (seed it in the bridge/agent flow or as the first
+  guided message).
+FILES: internal/web/templates/layout.html (chat markup + onopen system line),
+internal/bridge/bridge.go (sprint intent prompt), internal/service/intents.go.
+ACCEPTANCE: opening chat shows the connection line; asking to create a sprint
+yields the specified prompt.
+
+** TODO O2 — Chat quick-actions reflect KYC blocks
+WHY: "depending on the block that I have chosen during KYC, that's the ones that
+it will show details of 'What do you want to do today?' Pick an action ... Create
+new Sprint / Create new Post / Log today's work / Create new ADR."
+CURRENT: /new page + chat advertise a fixed action set. Not filtered by enabled
+blocks.
+TARGET:
+- The action set ("Create new Sprint", "Create new Post", "Log today's work",
+  "Create new ADR", etc.) is filtered to ENABLED blocks: Sprint→sprint,
+  Post→posts, Log→logs, ADR→adr. Disabled blocks' actions do not appear.
+- Source the enabled set from server (template) or the localStorage blob (A2).
+FILES: layout.html (chat actions), new.html, handlers.go (pass enabled set),
+internal/service/intents.go.
+ACCEPTANCE: with posts+adr disabled, chat/new only offer Sprint + Log actions.
+
+* EPIC P — New-entry hub  :new:
+** TODO P1 — Sprint action at the top of /new
+WHY: "the new entry page, have the sprint at the top."
+CURRENT: /new (handleNew) lists action cards (sprint/post/log/adr) + recent
+sprints/adrs; ordering not guaranteed sprint-first.
+TARGET: reorder so "Create new Sprint" is the first/primary action; keep the
+"What do you want to do today? Pick an action..." framing; actions gated by
+enabled blocks (shares EPIC O2).
+FILES: new.html, handlers.go (handleNew).
+ACCEPTANCE: /new shows Sprint as the top action.
+
+* EPIC Q — CRUD completeness for every block  :crud:
+** TODO Q1 — Verify/complete CRUD for all blocks
+WHY: "remember to set up CRUD for all the blocks that we have."
+CURRENT (routes in web.go): sprints (create/phase/status/retro/delete),
+checklist toggle, logs (create/delete), posts (create/tier/delete), adrs
+(create/update/delete), todos (create/status/delete), habits (create/toggle),
+review (save). MISSING/INCOMPLETE: edit/update for logs and todos (no edit),
+habit delete/archive, post edit beyond tier, sprint deliverables CRUD (add/toggle
+per phase2/04), ADR/post/sprint detail-level edits.
+TARGET: for each enabled block ensure full Create / Read / Update / Delete:
+  - sprint: + deliverables add/toggle/delete (phase2/04 AddDeliverable/Toggle);
+    edit core fields.
+  - logs: add update/edit (currently create+delete only).
+  - todos: add edit (text/priority/due) beyond status/delete.
+  - habits: add delete/archive (Archived field exists).
+  - posts: add post-level edit (title/type) + per-tier (exists).
+  - adr: full edit exists (update) — add detail page (EPIC G2).
+  - review: edit/save exists.
+FILES: internal/web/web.go (new routes), handlers.go + forms.go, internal/store/*,
+internal/service/*.
+ACCEPTANCE: each enabled block supports the full CRUD lifecycle from its page.
+
+* DEPENDENCIES / SUGGESTED ORDER
+1. C (gating) + B (onboarding) — establishes the "selected-only" invariant.
+2. A (auth/localStorage) — provides enabledBlocks to the client for O/P.
+3. E (sprint rules/health/mother) — core data + nesting.
+4. F (daily entries + generate post) — builds on E + bridge.
+5. G/H/I/J/K (per-page fixes) — independent, parallelizable.
+6. L (todos+checklist sync) + M (habits) + N (settings) + O/P (chat/new) + Q (CRUD).
+
+* OPEN QUESTIONS (resolve before/while implementing)
+- E1: keep GLOBAL single-active sprint, or relax to per-ISO-week active? (default:
+  one running at a time, reject 2nd active in same week).
+- F1: model "daily retro" as a new dated table or reuse DailyLog fields?
+- F3: generate-post sync (request/response) vs streamed over the existing WS?
+- A2: localStorage written via injected script on redirect, or via GET /api/me?
+- C2: disabled-route response = 403 or 404? (default: 404 with a friendly page).
